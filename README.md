@@ -63,6 +63,18 @@ The generated data simulates the FISST Academy cybersecurity case study outcomes
 - **ROI**: ₹7.3 crore avoided fraud, 15x return on investment
 - **Organization**: All employees belong to "FISST Academy"
 
+## Testing
+
+Run the test suite to validate functionality:
+```bash
+python test_database_populator.py
+```
+
+Run the demo to see sample data generation:
+```bash
+python demo.py
+```
+
 ## Example Output
 
 ```
@@ -100,4 +112,23 @@ Reporting Rate: 0.0% (baseline) → 37.8% (post-intervention)
 USB Incidents: 11 (before intervention) → 0 (after intervention)
 Intrusion Attempts: 50 blocked at reception
 ROI: ₹73.0 crore avoided fraud, 15x return on investment
+```
+
+## Data Management
+
+When you run the script with existing data:
+
+```
+⚠️  Data already exists in the database tables.
+
+=== Existing Data Summary ===
+Employees: 50 records
+Security Metrics: 250 records
+Usb Incidents: 11 records
+Intrusion Attempts: 50 records
+Roi Tracking: 1 records
+
+Do you want to delete all existing data? (yes/no): yes
+✓ All existing data deleted successfully!
+Do you want to generate fresh data? (yes/no): yes
 ```
