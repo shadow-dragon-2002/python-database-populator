@@ -366,7 +366,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_master (
                 serial_no INT AUTO_INCREMENT PRIMARY KEY,
-                employee_id VARCHAR(20) UNIQUE NOT NULL COLLATE utf8mb4_unicode_ci,
+                employee_id INT UNIQUE NOT NULL,
                 first_name VARCHAR(50) NOT NULL,
                 last_name VARCHAR(50) NOT NULL,
                 gender CHAR(1),
@@ -436,7 +436,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_master (
                 serial_no SERIAL PRIMARY KEY,
-                employee_id VARCHAR(20) UNIQUE NOT NULL,
+                employee_id INT UNIQUE NOT NULL,
                 first_name VARCHAR(50) NOT NULL,
                 last_name VARCHAR(50) NOT NULL,
                 gender CHAR(1),
@@ -509,7 +509,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_phish_smish_sim (
                 sim_id INT AUTO_INCREMENT PRIMARY KEY,
-                employee_id VARCHAR(20) NOT NULL COLLATE utf8mb4_unicode_ci,
+                employee_id INT NOT NULL,
                 simulation_type VARCHAR(50),
                 work_email VARCHAR(100),
                 personal_email VARCHAR(100),
@@ -522,7 +522,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_phish_smish_sim (
                 sim_id SERIAL PRIMARY KEY,
-                employee_id VARCHAR(20) NOT NULL,
+                employee_id INT NOT NULL,
                 simulation_type VARCHAR(50),
                 work_email VARCHAR(100),
                 personal_email VARCHAR(100),
@@ -538,7 +538,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_vishing_sim (
                 sim_id INT AUTO_INCREMENT PRIMARY KEY,
-                employee_id VARCHAR(20) NOT NULL COLLATE utf8mb4_unicode_ci,
+                employee_id INT NOT NULL,
                 phone_number VARCHAR(20),
                 alt_phone_number VARCHAR(20),
                 vish_response_rate DECIMAL(5,2),
@@ -550,7 +550,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_vishing_sim (
                 sim_id SERIAL PRIMARY KEY,
-                employee_id VARCHAR(20) NOT NULL,
+                employee_id INT NOT NULL,
                 phone_number VARCHAR(20),
                 alt_phone_number VARCHAR(20),
                 vish_response_rate DECIMAL(5,2),
@@ -565,7 +565,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_quishing_sim (
                 sim_id INT AUTO_INCREMENT PRIMARY KEY,
-                employee_id VARCHAR(20) NOT NULL COLLATE utf8mb4_unicode_ci,
+                employee_id INT NOT NULL,
                 qr_code_type VARCHAR(50),
                 qr_scan_rate DECIMAL(5,2),
                 malicious_qr_clicked BOOLEAN,
@@ -579,7 +579,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_quishing_sim (
                 sim_id SERIAL PRIMARY KEY,
-                employee_id VARCHAR(20) NOT NULL,
+                employee_id INT NOT NULL,
                 qr_code_type VARCHAR(50),
                 qr_scan_rate DECIMAL(5,2),
                 malicious_qr_clicked BOOLEAN,
@@ -596,7 +596,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS red_team_assessment (
                 assess_id INT AUTO_INCREMENT PRIMARY KEY,
-                employee_id VARCHAR(20) NOT NULL COLLATE utf8mb4_unicode_ci,
+                employee_id INT NOT NULL,
                 branch_code VARCHAR(10),
                 local_employees_at_branch INT,
                 security_level VARCHAR(20),
@@ -632,7 +632,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS red_team_assessment (
                 assess_id SERIAL PRIMARY KEY,
-                employee_id VARCHAR(20) NOT NULL,
+                employee_id INT NOT NULL,
                 branch_code VARCHAR(10),
                 local_employees_at_branch INT,
                 security_level VARCHAR(20),
@@ -736,7 +736,7 @@ class DatabasePopulator:
         used_emails = set()
         
         for i in range(num_employees):
-            employee_id = f"FISST{str(i+1).zfill(4)}"
+            employee_id = i + 1  # Integer employee_id starting from 1
             
             # Generate Indian name components
             name_parts = self.fake.indian_name().split()
@@ -907,8 +907,8 @@ class DatabasePopulator:
             # Generate multiple simulation entries per employee
             for _ in range(random.randint(2, 4)):
                 # Get employee work and personal email from employee_master
-                work_email = f"{employee_id.lower().replace('fisst', 'emp')}@fisst.edu"
-                personal_email = f"{employee_id.lower().replace('fisst', 'emp')}@gmail.com"
+                work_email = f"emp{employee_id}@fisst.edu"
+                personal_email = f"emp{employee_id}@gmail.com"
                 
                 # Use consistent statistics with small individual variations
                 click_response_rate = random.uniform(base_click_rate - 1.5, base_click_rate + 1.5)
