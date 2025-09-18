@@ -344,6 +344,8 @@ class DatabasePopulator:
             return common_sql.format("INT AUTO_INCREMENT")
         else:
             return common_sql.format("SERIAL")
+    
+    def _get_red_team_assessment_table_sql(self):
         """SQL for red_team_assessment table"""
         common_sql = """
         CREATE TABLE IF NOT EXISTS red_team_assessment (
@@ -707,6 +709,8 @@ class DatabasePopulator:
             print(f"✗ Error generating quishing simulations: {e}")
             self.connection.rollback()
             return False
+    
+    def generate_red_team_assessments(self, employee_ids):
         """Generate red team assessment data"""
         assessment_data = []
         security_levels = ['Low', 'Medium', 'High', 'Critical']
