@@ -118,13 +118,13 @@ class DatabasePopulator:
             return False
     
     def create_tables(self):
-        """Create all required tables"""
+        """Create all required tables based on the provided ER diagram"""
         tables = {
-            'employees': self._get_employees_table_sql(),
-            'security_metrics': self._get_security_metrics_table_sql(),
-            'usb_incidents': self._get_usb_incidents_table_sql(),
-            'intrusion_attempts': self._get_intrusion_attempts_table_sql(),
-            'roi_tracking': self._get_roi_tracking_table_sql()
+            'employee_master': self._get_employee_master_table_sql(),
+            'employee_phish_smish_sim': self._get_employee_phish_smish_sim_table_sql(),
+            'employee_vishing_sim': self._get_employee_vishing_sim_table_sql(),
+            'employee_quishing_sim': self._get_employee_quishing_sim_table_sql(),
+            'red_team_assessment': self._get_red_team_assessment_table_sql()
         }
         
         try:
@@ -142,57 +142,161 @@ class DatabasePopulator:
         
         return True
     
-    def _get_employees_table_sql(self):
-        """SQL for employees table"""
+    def _get_employee_master_table_sql(self):
+        """SQL for employee_master table based on ER diagram"""
         if self.db_type == 'mysql':
             return """
-            CREATE TABLE IF NOT EXISTS employees (
-                id INT AUTO_INCREMENT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS employee_master (
+                serial_no INT AUTO_INCREMENT PRIMARY KEY,
                 employee_id VARCHAR(20) UNIQUE NOT NULL,
-                name VARCHAR(100) NOT NULL,
-                email VARCHAR(100) UNIQUE NOT NULL,
-                phone VARCHAR(20),
+                first_name VARCHAR(50) NOT NULL,
+                last_name VARCHAR(50) NOT NULL,
+                gender CHAR(1),
+                date_of_birth DATE,
+                age INT,
+                blood_group VARCHAR(5),
+                marital_status VARCHAR(20),
+                email VARCHAR(100),
+                phone_number VARCHAR(20),
+                address VARCHAR(255),
+                state VARCHAR(50),
+                postal_code VARCHAR(10),
+                country VARCHAR(50) DEFAULT 'India',
+                designation VARCHAR(50),
                 department VARCHAR(50),
-                position VARCHAR(50),
-                city VARCHAR(50),
-                address TEXT,
-                hire_date DATE,
-                organization VARCHAR(100) DEFAULT 'FISST Academy',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                salary DECIMAL(10,2),
+                work_experience_years DECIMAL(4,1),
+                joining_date DATE,
+                emergency_contact_name VARCHAR(100),
+                emergency_contact_phone VARCHAR(20),
+                family_details VARCHAR(255),
+                medical_conditions VARCHAR(255),
+                simulation_type VARCHAR(50),
+                work_email VARCHAR(100),
+                personal_email VARCHAR(100),
+                click_response_rate DECIMAL(5,2),
+                phish_test_simulation_date DATE,
+                phish_testing_status VARCHAR(20),
+                vishing_phone_number VARCHAR(20),
+                vishing_alt_phone_number VARCHAR(20),
+                voice_auth_test BOOLEAN,
+                vish_response_rate DECIMAL(5,2),
+                vish_test_simulation_date DATE,
+                vish_testing_status VARCHAR(20),
+                branch_location VARCHAR(100),
+                branch_code VARCHAR(10),
+                total_employees_at_branch INT,
+                security_level VARCHAR(20),
+                building_storeys INT,
+                assessment_date DATE,
+                assessment_time_start TIME,
+                assessment_time_end TIME,
+                permission_granted BOOLEAN,
+                approving_official_name VARCHAR(100),
+                approving_official_designation VARCHAR(50),
+                identity_verification_required BOOLEAN,
+                identity_verified BOOLEAN,
+                security_guard_present BOOLEAN,
+                visitor_log_maintained BOOLEAN,
+                badge_issued BOOLEAN,
+                escort_required BOOLEAN,
+                restricted_areas_accessed BOOLEAN,
+                tailgating_possible BOOLEAN,
+                social_engineering_successful BOOLEAN,
+                physical_security_score DECIMAL(5,1),
+                human_security_score DECIMAL(5,1),
+                overall_assessment_score DECIMAL(5,1),
+                vulnerabilities_found VARCHAR(255),
+                recommendations VARCHAR(255),
+                assessor_name VARCHAR(100),
+                assessor_id VARCHAR(20),
+                notes VARCHAR(255),
+                red_team_testing_status VARCHAR(20)
             )
             """
         else:  # postgresql
             return """
-            CREATE TABLE IF NOT EXISTS employees (
-                id SERIAL PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS employee_master (
+                serial_no SERIAL PRIMARY KEY,
                 employee_id VARCHAR(20) UNIQUE NOT NULL,
-                name VARCHAR(100) NOT NULL,
-                email VARCHAR(100) UNIQUE NOT NULL,
-                phone VARCHAR(20),
+                first_name VARCHAR(50) NOT NULL,
+                last_name VARCHAR(50) NOT NULL,
+                gender CHAR(1),
+                date_of_birth DATE,
+                age INT,
+                blood_group VARCHAR(5),
+                marital_status VARCHAR(20),
+                email VARCHAR(100),
+                phone_number VARCHAR(20),
+                address VARCHAR(255),
+                state VARCHAR(50),
+                postal_code VARCHAR(10),
+                country VARCHAR(50) DEFAULT 'India',
+                designation VARCHAR(50),
                 department VARCHAR(50),
-                position VARCHAR(50),
-                city VARCHAR(50),
-                address TEXT,
-                hire_date DATE,
-                organization VARCHAR(100) DEFAULT 'FISST Academy',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                salary DECIMAL(10,2),
+                work_experience_years DECIMAL(4,1),
+                joining_date DATE,
+                emergency_contact_name VARCHAR(100),
+                emergency_contact_phone VARCHAR(20),
+                family_details VARCHAR(255),
+                medical_conditions VARCHAR(255),
+                simulation_type VARCHAR(50),
+                work_email VARCHAR(100),
+                personal_email VARCHAR(100),
+                click_response_rate DECIMAL(5,2),
+                phish_test_simulation_date DATE,
+                phish_testing_status VARCHAR(20),
+                vishing_phone_number VARCHAR(20),
+                vishing_alt_phone_number VARCHAR(20),
+                voice_auth_test BOOLEAN,
+                vish_response_rate DECIMAL(5,2),
+                vish_test_simulation_date DATE,
+                vish_testing_status VARCHAR(20),
+                branch_location VARCHAR(100),
+                branch_code VARCHAR(10),
+                total_employees_at_branch INT,
+                security_level VARCHAR(20),
+                building_storeys INT,
+                assessment_date DATE,
+                assessment_time_start TIME,
+                assessment_time_end TIME,
+                permission_granted BOOLEAN,
+                approving_official_name VARCHAR(100),
+                approving_official_designation VARCHAR(50),
+                identity_verification_required BOOLEAN,
+                identity_verified BOOLEAN,
+                security_guard_present BOOLEAN,
+                visitor_log_maintained BOOLEAN,
+                badge_issued BOOLEAN,
+                escort_required BOOLEAN,
+                restricted_areas_accessed BOOLEAN,
+                tailgating_possible BOOLEAN,
+                social_engineering_successful BOOLEAN,
+                physical_security_score DECIMAL(5,1),
+                human_security_score DECIMAL(5,1),
+                overall_assessment_score DECIMAL(5,1),
+                vulnerabilities_found VARCHAR(255),
+                recommendations VARCHAR(255),
+                assessor_name VARCHAR(100),
+                assessor_id VARCHAR(20),
+                notes VARCHAR(255),
+                red_team_testing_status VARCHAR(20)
             )
             """
     
-    def _get_security_metrics_table_sql(self):
-        """SQL for security metrics table"""
+    def _get_employee_phish_smish_sim_table_sql(self):
+        """SQL for employee_phish_smish_sim table"""
         common_sql = """
-        CREATE TABLE IF NOT EXISTS security_metrics (
-            id {} PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS employee_phish_smish_sim (
+            sim_id {} PRIMARY KEY,
             employee_id VARCHAR(20) NOT NULL,
-            metric_date DATE NOT NULL,
-            click_rate DECIMAL(5,2),
-            reporting_rate DECIMAL(5,2),
-            training_completed BOOLEAN DEFAULT FALSE,
             simulation_type VARCHAR(50),
-            intervention_applied BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+            work_email VARCHAR(100),
+            personal_email VARCHAR(100),
+            click_response_rate DECIMAL(5,2),
+            testing_status VARCHAR(20),
+            FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
         )
         """
         
@@ -201,18 +305,17 @@ class DatabasePopulator:
         else:
             return common_sql.format("SERIAL")
     
-    def _get_usb_incidents_table_sql(self):
-        """SQL for USB incidents table"""
+    def _get_employee_vishing_sim_table_sql(self):
+        """SQL for employee_vishing_sim table"""
         common_sql = """
-        CREATE TABLE IF NOT EXISTS usb_incidents (
-            id {} PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS employee_vishing_sim (
+            sim_id {} PRIMARY KEY,
             employee_id VARCHAR(20) NOT NULL,
-            incident_date DATE NOT NULL,
-            device_type VARCHAR(50),
-            blocked BOOLEAN DEFAULT FALSE,
-            location VARCHAR(100),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+            phone_number VARCHAR(20),
+            alt_phone_number VARCHAR(20),
+            vish_response_rate DECIMAL(5,2),
+            testing_status VARCHAR(20),
+            FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
         )
         """
         
@@ -221,17 +324,19 @@ class DatabasePopulator:
         else:
             return common_sql.format("SERIAL")
     
-    def _get_intrusion_attempts_table_sql(self):
-        """SQL for intrusion attempts table"""
+    def _get_employee_quishing_sim_table_sql(self):
+        """SQL for employee_quishing_sim table (QR code phishing)"""
         common_sql = """
-        CREATE TABLE IF NOT EXISTS intrusion_attempts (
-            id {} PRIMARY KEY,
-            attempt_date DATE NOT NULL,
-            source_ip VARCHAR(45),
-            attempt_type VARCHAR(50),
-            blocked_at_reception BOOLEAN DEFAULT TRUE,
-            severity VARCHAR(20),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        CREATE TABLE IF NOT EXISTS employee_quishing_sim (
+            sim_id {} PRIMARY KEY,
+            employee_id VARCHAR(20) NOT NULL,
+            qr_code_type VARCHAR(50),
+            qr_scan_rate DECIMAL(5,2),
+            malicious_qr_clicked BOOLEAN,
+            device_type VARCHAR(50),
+            testing_status VARCHAR(20),
+            simulation_date DATE,
+            FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
         )
         """
         
@@ -239,39 +344,51 @@ class DatabasePopulator:
             return common_sql.format("INT AUTO_INCREMENT")
         else:
             return common_sql.format("SERIAL")
-    
-    def _get_roi_tracking_table_sql(self):
-        """SQL for ROI tracking table"""
+        """SQL for red_team_assessment table"""
+        common_sql = """
+        CREATE TABLE IF NOT EXISTS red_team_assessment (
+            assess_id {} PRIMARY KEY,
+            employee_id VARCHAR(20) NOT NULL,
+            branch_code VARCHAR(10),
+            local_employees_at_branch INT,
+            security_level VARCHAR(20),
+            building_storeys INT,
+            assessment_date DATE,
+            assessment_time_start TIME,
+            assessment_time_end TIME,
+            permission_granted BOOLEAN,
+            approving_official_name VARCHAR(100),
+            approving_official_designation VARCHAR(50),
+            identity_verification_required BOOLEAN,
+            identity_verified BOOLEAN,
+            security_guard_present BOOLEAN,
+            visitor_log_maintained BOOLEAN,
+            badge_issued BOOLEAN,
+            escort_required BOOLEAN,
+            restricted_areas_accessed BOOLEAN,
+            tailgating_possible BOOLEAN,
+            social_engineering_successful BOOLEAN,
+            physical_security_score DECIMAL(5,1),
+            human_security_score DECIMAL(5,1),
+            overall_assessment_score DECIMAL(5,1),
+            vulnerabilities_found VARCHAR(255),
+            recommendations VARCHAR(255),
+            assessor_name VARCHAR(100),
+            assessor_id VARCHAR(20),
+            notes VARCHAR(255),
+            testing_status VARCHAR(20),
+            FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+        )
+        """
+        
         if self.db_type == 'mysql':
-            return """
-            CREATE TABLE IF NOT EXISTS roi_tracking (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                tracking_date DATE NOT NULL,
-                engagement_cost DECIMAL(15,2),
-                avoided_fraud_amount DECIMAL(15,2),
-                roi_multiple DECIMAL(10,2),
-                currency VARCHAR(10) DEFAULT 'INR',
-                description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        else:  # postgresql
-            return """
-            CREATE TABLE IF NOT EXISTS roi_tracking (
-                id SERIAL PRIMARY KEY,
-                tracking_date DATE NOT NULL,
-                engagement_cost DECIMAL(15,2),
-                avoided_fraud_amount DECIMAL(15,2),
-                roi_multiple DECIMAL(10,2),
-                currency VARCHAR(10) DEFAULT 'INR',
-                description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
+            return common_sql.format("INT AUTO_INCREMENT")
+        else:
+            return common_sql.format("SERIAL")
     
     def check_data_exists(self):
         """Check if data exists in any of the tables"""
-        tables = ['employees', 'security_metrics', 'usb_incidents', 'intrusion_attempts', 'roi_tracking']
+        tables = ['employee_master', 'employee_phish_smish_sim', 'employee_vishing_sim', 'employee_quishing_sim', 'red_team_assessment']
         
         try:
             for table in tables:
@@ -286,8 +403,8 @@ class DatabasePopulator:
             return False
     
     def delete_all_data(self):
-        """Delete all data from tables"""
-        tables = ['roi_tracking', 'intrusion_attempts', 'usb_incidents', 'security_metrics', 'employees']
+        """Delete all data from tables in correct order (respecting foreign keys)"""
+        tables = ['red_team_assessment', 'employee_quishing_sim', 'employee_vishing_sim', 'employee_phish_smish_sim', 'employee_master']
         
         try:
             for table in tables:
@@ -301,36 +418,165 @@ class DatabasePopulator:
             return False
     
     def generate_employees(self, num_employees):
-        """Generate employee data"""
-        departments = ['IT Security', 'Human Resources', 'Finance', 'Operations', 'Marketing', 'Sales']
-        positions = ['Analyst', 'Manager', 'Coordinator', 'Specialist', 'Executive', 'Director']
+        """Generate employee master data based on ER diagram"""
+        departments = ['IT Security', 'Human Resources', 'Finance', 'Operations', 'Marketing', 'Sales', 'Research', 'Admin']
+        designations = ['Analyst', 'Manager', 'Coordinator', 'Specialist', 'Executive', 'Director', 'Team Lead', 'Senior Analyst']
+        blood_groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+        marital_statuses = ['Single', 'Married', 'Divorced', 'Widowed']
+        indian_states = ['Maharashtra', 'Karnataka', 'Tamil Nadu', 'Delhi', 'Uttar Pradesh', 'Gujarat', 'West Bengal', 'Rajasthan']
+        branch_codes = ['MUM01', 'DEL02', 'BLR03', 'HYD04', 'CHN05', 'KOL06', 'PUN07', 'AHM08']
+        branch_locations = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad']
         
         employees_data = []
+        used_emails = set()
+        
         for i in range(num_employees):
             employee_id = f"FISST{str(i+1).zfill(4)}"
-            name = self.fake.indian_name()
-            email = f"{name.lower().replace(' ', '.')}@fisst.edu"
-            phone = self.fake.indian_phone()
-            department = random.choice(departments)
-            position = random.choice(positions)
+            
+            # Generate Indian name components
+            name_parts = self.fake.indian_name().split()
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else 'Kumar'
+            
+            # Generate unique emails
+            base_work_email = f"{first_name.lower()}.{last_name.lower()}"
+            work_email = f"{base_work_email}@fisst.edu"
+            counter = 1
+            while work_email in used_emails:
+                work_email = f"{base_work_email}{counter}@fisst.edu"
+                counter += 1
+            used_emails.add(work_email)
+            
+            personal_email = f"{base_work_email}@gmail.com"
+            email = work_email  # Primary email
+            
+            # Generate other details
+            gender = random.choice(['M', 'F'])
+            date_of_birth = self.fake.date_between(start_date='-65y', end_date='-22y')
+            age = 2024 - date_of_birth.year
+            blood_group = random.choice(blood_groups)
+            marital_status = random.choice(marital_statuses)
+            phone_number = self.fake.indian_phone()
             city = self.fake.indian_city()
             address = f"{random.randint(1, 999)}, {self.fake.street_name()}, {city}"
-            hire_date = self.fake.date_between(start_date='-5y', end_date='today')
+            state = random.choice(indian_states)
+            postal_code = str(random.randint(100000, 999999))
+            country = 'India'
+            designation = random.choice(designations)
+            department = random.choice(departments)
+            salary = random.uniform(300000, 2000000)  # INR salary range
+            work_experience_years = random.uniform(0.5, 20.0)
+            joining_date = self.fake.date_between(start_date='-10y', end_date='today')
+            
+            # Emergency contact
+            emergency_contact_name = self.fake.indian_name()
+            emergency_contact_phone = self.fake.indian_phone()
+            
+            # Family and medical details
+            family_details = f"Family of {random.randint(2, 6)} members"
+            medical_conditions = random.choice(['None', 'Diabetes', 'Hypertension', 'Asthma', 'None', 'None'])  # Most have None
+            
+            # Simulation data - baseline values
+            simulation_type = 'Baseline Assessment'
+            click_response_rate = random.uniform(20, 24)  # Baseline ~22%
+            phish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
+            phish_testing_status = 'Completed'
+            
+            # Vishing data
+            vishing_phone_number = phone_number
+            vishing_alt_phone_number = self.fake.indian_phone()
+            voice_auth_test = random.choice([True, False])
+            vish_response_rate = random.uniform(15, 25)  # Baseline vishing response
+            vish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
+            vish_testing_status = 'Completed'
+            
+            # Branch and assessment data
+            branch_idx = i % len(branch_codes)
+            branch_location = branch_locations[branch_idx]
+            branch_code = branch_codes[branch_idx]
+            total_employees_at_branch = random.randint(15, 50)
+            security_level = random.choice(['Low', 'Medium', 'High'])
+            building_storeys = random.randint(1, 10)
+            
+            # Assessment details
+            assessment_date = self.fake.date_between(start_date='-3m', end_date='today')
+            assessment_time_start = self.fake.time()
+            assessment_time_end = self.fake.time()
+            permission_granted = random.choice([True, False])
+            approving_official_name = self.fake.indian_name()
+            approving_official_designation = random.choice(['Manager', 'Director', 'VP', 'Senior Manager'])
+            
+            # Security flags
+            identity_verification_required = True
+            identity_verified = random.choice([True, False])
+            security_guard_present = random.choice([True, False])
+            visitor_log_maintained = True
+            badge_issued = random.choice([True, False])
+            escort_required = random.choice([True, False])
+            restricted_areas_accessed = random.choice([True, False])
+            tailgating_possible = random.choice([True, False])
+            social_engineering_successful = random.choice([True, False])
+            
+            # Scores (post-intervention should be higher)
+            physical_security_score = random.uniform(6.0, 9.0)
+            human_security_score = random.uniform(7.0, 9.5)
+            overall_assessment_score = (physical_security_score + human_security_score) / 2
+            
+            # Assessment details
+            vulnerabilities_found = random.choice([
+                'Weak access controls', 'Inadequate visitor management', 'Social engineering susceptibility',
+                'Poor password practices', 'Unsecured workstations', 'None significant'
+            ])
+            recommendations = random.choice([
+                'Implement two-factor authentication', 'Enhanced security training',
+                'Improve visitor access controls', 'Regular security assessments',
+                'Employee awareness programs', 'Continue current practices'
+            ])
+            assessor_name = self.fake.indian_name()
+            assessor_id = f"ASST{random.randint(1, 20):02d}"
+            notes = f"Assessment completed for {department} department employee"
+            red_team_testing_status = 'Completed'
             
             employees_data.append((
-                employee_id, name, email, phone, department, position,
-                city, address, hire_date
+                employee_id, first_name, last_name, gender, date_of_birth, age, blood_group, marital_status,
+                email, phone_number, address, state, postal_code, country, designation, department,
+                salary, work_experience_years, joining_date, emergency_contact_name, emergency_contact_phone,
+                family_details, medical_conditions, simulation_type, work_email, personal_email,
+                click_response_rate, phish_test_simulation_date, phish_testing_status,
+                vishing_phone_number, vishing_alt_phone_number, voice_auth_test, vish_response_rate,
+                vish_test_simulation_date, vish_testing_status, branch_location, branch_code,
+                total_employees_at_branch, security_level, building_storeys, assessment_date,
+                assessment_time_start, assessment_time_end, permission_granted, approving_official_name,
+                approving_official_designation, identity_verification_required, identity_verified,
+                security_guard_present, visitor_log_maintained, badge_issued, escort_required,
+                restricted_areas_accessed, tailgating_possible, social_engineering_successful,
+                physical_security_score, human_security_score, overall_assessment_score,
+                vulnerabilities_found, recommendations, assessor_name, assessor_id, notes, red_team_testing_status
             ))
         
         try:
             sql = """
-            INSERT INTO employees (employee_id, name, email, phone, department, position, city, address, hire_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO employee_master (
+                employee_id, first_name, last_name, gender, date_of_birth, age, blood_group, marital_status,
+                email, phone_number, address, state, postal_code, country, designation, department,
+                salary, work_experience_years, joining_date, emergency_contact_name, emergency_contact_phone,
+                family_details, medical_conditions, simulation_type, work_email, personal_email,
+                click_response_rate, phish_test_simulation_date, phish_testing_status,
+                vishing_phone_number, vishing_alt_phone_number, voice_auth_test, vish_response_rate,
+                vish_test_simulation_date, vish_testing_status, branch_location, branch_code,
+                total_employees_at_branch, security_level, building_storeys, assessment_date,
+                assessment_time_start, assessment_time_end, permission_granted, approving_official_name,
+                approving_official_designation, identity_verification_required, identity_verified,
+                security_guard_present, visitor_log_maintained, badge_issued, escort_required,
+                restricted_areas_accessed, tailgating_possible, social_engineering_successful,
+                physical_security_score, human_security_score, overall_assessment_score,
+                vulnerabilities_found, recommendations, assessor_name, assessor_id, notes, red_team_testing_status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             
             self.cursor.executemany(sql, employees_data)
             self.connection.commit()
-            print(f"✓ Generated {num_employees} employees successfully!")
+            print(f"✓ Generated {num_employees} employees in employee_master table!")
             return True
             
         except Exception as e:
@@ -338,157 +584,218 @@ class DatabasePopulator:
             self.connection.rollback()
             return False
     
-    def generate_security_metrics(self, employee_ids):
-        """Generate security metrics data based on case study"""
-        metrics_data = []
+    def generate_phish_smish_simulations(self, employee_ids):
+        """Generate phishing/smishing simulation data"""
+        sim_data = []
+        simulation_types = ['Email Phishing', 'SMS Phishing', 'Social Media Phishing']
+        testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
         
-        # Generate baseline data (22% click rate, 0% reporting)
-        baseline_entries = len(employee_ids) * 3  # 3 baseline measurements per employee
-        for _ in range(baseline_entries):
-            employee_id = random.choice(employee_ids)
-            click_rate = random.uniform(20, 24)  # Around 22%
-            reporting_rate = 0  # Zero reporting initially
-            
-            metrics_data.append((
-                employee_id,
-                self.fake.date_between(start_date='-6m', end_date='-3m'),
-                click_rate,
-                reporting_rate,
-                False,  # training_completed
-                'Baseline',
-                False   # intervention_applied
-            ))
-        
-        # Generate post-intervention data (5% click rate, 38% reporting)
-        intervention_entries = len(employee_ids) * 2  # 2 post-intervention measurements per employee
-        for _ in range(intervention_entries):
-            employee_id = random.choice(employee_ids)
-            click_rate = random.uniform(3, 7)  # Around 5%
-            reporting_rate = random.uniform(35, 41)  # Around 38%
-            
-            metrics_data.append((
-                employee_id,
-                self.fake.date_between(start_date='-3m', end_date='today'),
-                click_rate,
-                reporting_rate,
-                random.choice([True, False]),  # training_completed
-                random.choice(['Simulation', 'Intrusion Test', 'Training']),
-                True   # intervention_applied
-            ))
+        for employee_id in employee_ids:
+            # Generate multiple simulation entries per employee
+            for _ in range(random.randint(2, 4)):
+                # Get employee work and personal email from employee_master
+                work_email = f"{employee_id.lower().replace('fisst', 'emp')}@fisst.edu"
+                personal_email = f"{employee_id.lower().replace('fisst', 'emp')}@gmail.com"
+                
+                # Baseline: ~22% click rate, Post-intervention: ~5% click rate
+                click_response_rate = random.uniform(20, 24) if random.random() < 0.6 else random.uniform(3, 7)
+                
+                sim_data.append((
+                    employee_id,
+                    random.choice(simulation_types),
+                    work_email,
+                    personal_email,
+                    click_response_rate,
+                    random.choice(testing_statuses)
+                ))
         
         try:
             sql = """
-            INSERT INTO security_metrics (employee_id, metric_date, click_rate, reporting_rate, training_completed, simulation_type, intervention_applied)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """
-            
-            self.cursor.executemany(sql, metrics_data)
-            self.connection.commit()
-            print(f"✓ Generated {len(metrics_data)} security metrics entries!")
-            return True
-            
-        except Exception as e:
-            print(f"✗ Error generating security metrics: {e}")
-            self.connection.rollback()
-            return False
-    
-    def generate_usb_incidents(self, employee_ids):
-        """Generate USB incident data"""
-        incidents_data = []
-        device_types = ['USB Drive', 'External HDD', 'Phone', 'Tablet', 'Unknown Device']
-        locations = ['Workstation', 'Conference Room', 'Lab', 'Reception', 'Server Room']
-        
-        # Generate 11 initial incidents (before intervention)
-        for _ in range(11):
-            employee_id = random.choice(employee_ids)
-            incidents_data.append((
-                employee_id,
-                self.fake.date_between(start_date='-6m', end_date='-3m'),
-                random.choice(device_types),
-                False,  # not blocked initially
-                random.choice(locations)
-            ))
-        
-        # After intervention: 0 incidents (all blocked)
-        # No additional incidents as they're all blocked now
-        
-        try:
-            sql = """
-            INSERT INTO usb_incidents (employee_id, incident_date, device_type, blocked, location)
-            VALUES (%s, %s, %s, %s, %s)
-            """
-            
-            self.cursor.executemany(sql, incidents_data)
-            self.connection.commit()
-            print(f"✓ Generated {len(incidents_data)} USB incident entries!")
-            return True
-            
-        except Exception as e:
-            print(f"✗ Error generating USB incidents: {e}")
-            self.connection.rollback()
-            return False
-    
-    def generate_intrusion_attempts(self):
-        """Generate intrusion attempts data"""
-        attempts_data = []
-        attempt_types = ['Phishing', 'Malware', 'Social Engineering', 'Network Scan', 'Brute Force']
-        severities = ['Low', 'Medium', 'High', 'Critical']
-        
-        # Generate various intrusion attempts, all blocked at reception
-        for _ in range(50):
-            attempts_data.append((
-                self.fake.date_between(start_date='-6m', end_date='today'),
-                self.fake.ipv4(),
-                random.choice(attempt_types),
-                True,  # blocked_at_reception
-                random.choice(severities)
-            ))
-        
-        try:
-            sql = """
-            INSERT INTO intrusion_attempts (attempt_date, source_ip, attempt_type, blocked_at_reception, severity)
-            VALUES (%s, %s, %s, %s, %s)
-            """
-            
-            self.cursor.executemany(sql, attempts_data)
-            self.connection.commit()
-            print(f"✓ Generated {len(attempts_data)} intrusion attempt entries!")
-            return True
-            
-        except Exception as e:
-            print(f"✗ Error generating intrusion attempts: {e}")
-            self.connection.rollback()
-            return False
-    
-    def generate_roi_tracking(self):
-        """Generate ROI tracking data"""
-        # Based on case study: ₹7.3 crore avoided, 15x+ ROI
-        engagement_cost = Decimal('48666666.67')  # ₹7.3 crore / 15 = approx ₹48.67 lakh
-        avoided_fraud = Decimal('730000000.00')  # ₹7.3 crore
-        roi_multiple = Decimal('15.0')
-        
-        roi_data = [(
-            self.fake.date_between(start_date='-1m', end_date='today'),
-            engagement_cost,
-            avoided_fraud,
-            roi_multiple,
-            'INR',
-            'Avoided phishing payroll fraud through security awareness training and intervention measures'
-        )]
-        
-        try:
-            sql = """
-            INSERT INTO roi_tracking (tracking_date, engagement_cost, avoided_fraud_amount, roi_multiple, currency, description)
+            INSERT INTO employee_phish_smish_sim (employee_id, simulation_type, work_email, personal_email, click_response_rate, testing_status)
             VALUES (%s, %s, %s, %s, %s, %s)
             """
             
-            self.cursor.executemany(sql, roi_data)
+            self.cursor.executemany(sql, sim_data)
             self.connection.commit()
-            print(f"✓ Generated ROI tracking entry!")
+            print(f"✓ Generated {len(sim_data)} phishing/smishing simulation entries!")
             return True
             
         except Exception as e:
-            print(f"✗ Error generating ROI tracking: {e}")
+            print(f"✗ Error generating phish/smish simulations: {e}")
+            self.connection.rollback()
+            return False
+    
+    def generate_vishing_simulations(self, employee_ids):
+        """Generate vishing (voice phishing) simulation data"""
+        sim_data = []
+        testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
+        
+        for employee_id in employee_ids:
+            # Generate vishing simulation entries
+            for _ in range(random.randint(1, 3)):
+                phone_number = self.fake.indian_phone()
+                alt_phone_number = self.fake.indian_phone()
+                
+                # Vishing response rate (similar pattern to phishing)
+                vish_response_rate = random.uniform(18, 28) if random.random() < 0.6 else random.uniform(2, 8)
+                
+                sim_data.append((
+                    employee_id,
+                    phone_number,
+                    alt_phone_number,
+                    vish_response_rate,
+                    random.choice(testing_statuses)
+                ))
+        
+        try:
+            sql = """
+            INSERT INTO employee_vishing_sim (employee_id, phone_number, alt_phone_number, vish_response_rate, testing_status)
+            VALUES (%s, %s, %s, %s, %s)
+            """
+            
+            self.cursor.executemany(sql, sim_data)
+            self.connection.commit()
+            print(f"✓ Generated {len(sim_data)} vishing simulation entries!")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error generating vishing simulations: {e}")
+            self.connection.rollback()
+            return False
+    
+    def generate_quishing_simulations(self, employee_ids):
+        """Generate quishing (QR code phishing) simulation data"""
+        sim_data = []
+        qr_code_types = ['Payment QR', 'WiFi QR', 'App Download QR', 'Survey QR', 'Menu QR', 'Contact QR']
+        device_types = ['Mobile Phone', 'Tablet', 'Laptop', 'Desktop']
+        testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
+        
+        for employee_id in employee_ids:
+            # Generate quishing simulation entries
+            for _ in range(random.randint(1, 2)):
+                qr_code_type = random.choice(qr_code_types)
+                
+                # QR scan and click rates (similar pattern to phishing)
+                qr_scan_rate = random.uniform(15, 30) if random.random() < 0.6 else random.uniform(2, 8)
+                malicious_qr_clicked = random.choice([True, False])
+                device_type = random.choice(device_types)
+                testing_status = random.choice(testing_statuses)
+                simulation_date = self.fake.date_between(start_date='-6m', end_date='today')
+                
+                sim_data.append((
+                    employee_id,
+                    qr_code_type,
+                    qr_scan_rate,
+                    malicious_qr_clicked,
+                    device_type,
+                    testing_status,
+                    simulation_date
+                ))
+        
+        try:
+            sql = """
+            INSERT INTO employee_quishing_sim (employee_id, qr_code_type, qr_scan_rate, malicious_qr_clicked, device_type, testing_status, simulation_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            self.cursor.executemany(sql, sim_data)
+            self.connection.commit()
+            print(f"✓ Generated {len(sim_data)} quishing simulation entries!")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error generating quishing simulations: {e}")
+            self.connection.rollback()
+            return False
+        """Generate red team assessment data"""
+        assessment_data = []
+        security_levels = ['Low', 'Medium', 'High', 'Critical']
+        testing_statuses = ['Completed', 'In Progress', 'Scheduled', 'Cancelled']
+        branch_codes = ['MUM01', 'DEL02', 'BLR03', 'HYD04', 'CHN05', 'KOL06', 'PUN07', 'AHM08']
+        
+        for employee_id in employee_ids:
+            # Generate assessment entries (not every employee gets assessed)
+            if random.random() < 0.7:  # 70% of employees get assessed
+                branch_code = random.choice(branch_codes)
+                local_employees_at_branch = random.randint(15, 50)
+                security_level = random.choice(security_levels)
+                building_storeys = random.randint(1, 10)
+                assessment_date = self.fake.date_between(start_date='-3m', end_date='today')
+                assessment_time_start = self.fake.time()
+                assessment_time_end = self.fake.time()
+                permission_granted = random.choice([True, False])
+                approving_official_name = self.fake.indian_name()
+                approving_official_designation = random.choice(['Manager', 'Director', 'VP', 'Senior Manager'])
+                
+                # Security measures
+                identity_verification_required = True
+                identity_verified = random.choice([True, False])
+                security_guard_present = random.choice([True, False])
+                visitor_log_maintained = True
+                badge_issued = random.choice([True, False])
+                escort_required = random.choice([True, False])
+                restricted_areas_accessed = random.choice([True, False])
+                tailgating_possible = random.choice([True, False])
+                social_engineering_successful = random.choice([True, False])
+                
+                # Assessment scores (higher scores = better security)
+                physical_security_score = random.uniform(6.0, 9.5)
+                human_security_score = random.uniform(7.0, 9.0)
+                overall_assessment_score = (physical_security_score + human_security_score) / 2
+                
+                vulnerabilities_found = random.choice([
+                    'Weak access controls, tailgating possible',
+                    'Social engineering susceptibility',
+                    'Inadequate visitor management',
+                    'Poor workstation security',
+                    'None significant',
+                    'Badge verification issues'
+                ])
+                
+                recommendations = random.choice([
+                    'Implement stricter access controls',
+                    'Enhanced security awareness training',
+                    'Improve visitor management system',
+                    'Regular security audits',
+                    'Deploy additional security measures',
+                    'Continue monitoring'
+                ])
+                
+                assessor_name = self.fake.indian_name()
+                assessor_id = f"ASST{random.randint(1, 20):02d}"
+                notes = f"Red team assessment completed - {security_level} security level facility"
+                testing_status = random.choice(testing_statuses)
+                
+                assessment_data.append((
+                    employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
+                    assessment_date, assessment_time_start, assessment_time_end, permission_granted,
+                    approving_official_name, approving_official_designation, identity_verification_required,
+                    identity_verified, security_guard_present, visitor_log_maintained, badge_issued,
+                    escort_required, restricted_areas_accessed, tailgating_possible, social_engineering_successful,
+                    physical_security_score, human_security_score, overall_assessment_score,
+                    vulnerabilities_found, recommendations, assessor_name, assessor_id, notes, testing_status
+                ))
+        
+        try:
+            sql = """
+            INSERT INTO red_team_assessment (
+                employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
+                assessment_date, assessment_time_start, assessment_time_end, permission_granted,
+                approving_official_name, approving_official_designation, identity_verification_required,
+                identity_verified, security_guard_present, visitor_log_maintained, badge_issued,
+                escort_required, restricted_areas_accessed, tailgating_possible, social_engineering_successful,
+                physical_security_score, human_security_score, overall_assessment_score,
+                vulnerabilities_found, recommendations, assessor_name, assessor_id, notes, testing_status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            self.cursor.executemany(sql, assessment_data)
+            self.connection.commit()
+            print(f"✓ Generated {len(assessment_data)} red team assessment entries!")
+            return True
+            
+        except Exception as e:
+            print(f"✗ Error generating red team assessments: {e}")
             self.connection.rollback()
             return False
     
@@ -497,11 +804,11 @@ class DatabasePopulator:
         print("\n=== Existing Data Summary ===")
         
         tables = {
-            'employees': 'SELECT COUNT(*) as count FROM employees',
-            'security_metrics': 'SELECT COUNT(*) as count FROM security_metrics',
-            'usb_incidents': 'SELECT COUNT(*) as count FROM usb_incidents',
-            'intrusion_attempts': 'SELECT COUNT(*) as count FROM intrusion_attempts',
-            'roi_tracking': 'SELECT COUNT(*) as count FROM roi_tracking'
+            'employee_master': 'SELECT COUNT(*) as count FROM employee_master',
+            'employee_phish_smish_sim': 'SELECT COUNT(*) as count FROM employee_phish_smish_sim',
+            'employee_vishing_sim': 'SELECT COUNT(*) as count FROM employee_vishing_sim',
+            'employee_quishing_sim': 'SELECT COUNT(*) as count FROM employee_quishing_sim',
+            'red_team_assessment': 'SELECT COUNT(*) as count FROM red_team_assessment'
         }
         
         for table_name, query in tables.items():
@@ -518,45 +825,100 @@ class DatabasePopulator:
         print("\n=== Generated Data Statistics Summary ===")
         
         try:
-            # Security metrics summary
+            # Employee master summary
+            self.cursor.execute("SELECT COUNT(*) as count FROM employee_master")
+            result = self.cursor.fetchone()
+            total_employees = result['count'] if isinstance(result, dict) else result[0]
+            print(f"Total Employees: {total_employees}")
+            
+            # Phishing simulation summary
             self.cursor.execute("""
                 SELECT 
-                    AVG(CASE WHEN intervention_applied = FALSE THEN click_rate END) as baseline_click_rate,
-                    AVG(CASE WHEN intervention_applied = TRUE THEN click_rate END) as post_intervention_click_rate,
-                    AVG(CASE WHEN intervention_applied = FALSE THEN reporting_rate END) as baseline_reporting_rate,
-                    AVG(CASE WHEN intervention_applied = TRUE THEN reporting_rate END) as post_intervention_reporting_rate
-                FROM security_metrics
+                    AVG(click_response_rate) as avg_click_rate,
+                    MIN(click_response_rate) as min_click_rate,
+                    MAX(click_response_rate) as max_click_rate,
+                    COUNT(*) as total_sims
+                FROM employee_phish_smish_sim
             """)
             
-            metrics = self.cursor.fetchone()
-            if metrics:
-                baseline_click = metrics['baseline_click_rate'] if isinstance(metrics, dict) else metrics[0]
-                post_click = metrics['post_intervention_click_rate'] if isinstance(metrics, dict) else metrics[1]
-                baseline_report = metrics['baseline_reporting_rate'] if isinstance(metrics, dict) else metrics[2]
-                post_report = metrics['post_intervention_reporting_rate'] if isinstance(metrics, dict) else metrics[3]
+            phish_metrics = self.cursor.fetchone()
+            if phish_metrics:
+                avg_click = phish_metrics['avg_click_rate'] if isinstance(phish_metrics, dict) else phish_metrics[0]
+                min_click = phish_metrics['min_click_rate'] if isinstance(phish_metrics, dict) else phish_metrics[1]
+                max_click = phish_metrics['max_click_rate'] if isinstance(phish_metrics, dict) else phish_metrics[2]
+                total_sims = phish_metrics['total_sims'] if isinstance(phish_metrics, dict) else phish_metrics[3]
                 
-                print(f"Click Rate: {baseline_click:.1f}% (baseline) → {post_click:.1f}% (post-intervention)")
-                print(f"Reporting Rate: {baseline_report:.1f}% (baseline) → {post_report:.1f}% (post-intervention)")
+                print(f"Phishing Simulations: {total_sims} total")
+                print(f"Click Response Rate: {avg_click:.1f}% (avg), {min_click:.1f}%-{max_click:.1f}% (range)")
             
-            # USB incidents
-            self.cursor.execute("SELECT COUNT(*) as count FROM usb_incidents WHERE blocked = FALSE")
-            result = self.cursor.fetchone()
-            usb_incidents = result['count'] if isinstance(result, dict) else result[0]
-            print(f"USB Incidents: {usb_incidents} (before intervention) → 0 (after intervention)")
+            # Vishing simulation summary
+            self.cursor.execute("""
+                SELECT 
+                    AVG(vish_response_rate) as avg_vish_rate,
+                    COUNT(*) as total_vish_sims
+                FROM employee_vishing_sim
+            """)
             
-            # Intrusion attempts
-            self.cursor.execute("SELECT COUNT(*) as count FROM intrusion_attempts WHERE blocked_at_reception = TRUE")
-            result = self.cursor.fetchone()
-            blocked_intrusions = result['count'] if isinstance(result, dict) else result[0]
-            print(f"Intrusion Attempts: {blocked_intrusions} blocked at reception")
+            vish_metrics = self.cursor.fetchone()
+            if vish_metrics:
+                avg_vish = vish_metrics['avg_vish_rate'] if isinstance(vish_metrics, dict) else vish_metrics[0]
+                total_vish = vish_metrics['total_vish_sims'] if isinstance(vish_metrics, dict) else vish_metrics[1]
+                print(f"Vishing Simulations: {total_vish} total")
+                print(f"Vishing Response Rate: {avg_vish:.1f}% (avg)")
             
-            # ROI
-            self.cursor.execute("SELECT avoided_fraud_amount, roi_multiple FROM roi_tracking LIMIT 1")
-            result = self.cursor.fetchone()
-            if result:
-                avoided_fraud = result['avoided_fraud_amount'] if isinstance(result, dict) else result[0]
-                roi_multiple = result['roi_multiple'] if isinstance(result, dict) else result[1]
-                print(f"ROI: ₹{float(avoided_fraud)/10000000:.1f} crore avoided fraud, {float(roi_multiple):.0f}x return on investment")
+            # Quishing simulation summary
+            self.cursor.execute("""
+                SELECT 
+                    AVG(qr_scan_rate) as avg_qr_scan_rate,
+                    COUNT(*) as total_quishing_sims,
+                    SUM(CASE WHEN malicious_qr_clicked = TRUE THEN 1 ELSE 0 END) as malicious_clicks
+                FROM employee_quishing_sim
+            """)
+            
+            quish_metrics = self.cursor.fetchone()
+            if quish_metrics:
+                avg_qr_scan = quish_metrics['avg_qr_scan_rate'] if isinstance(quish_metrics, dict) else quish_metrics[0]
+                total_quish = quish_metrics['total_quishing_sims'] if isinstance(quish_metrics, dict) else quish_metrics[1]
+                malicious_clicks = quish_metrics['malicious_clicks'] if isinstance(quish_metrics, dict) else quish_metrics[2]
+                print(f"Quishing Simulations: {total_quish} total")
+                print(f"QR Scan Rate: {avg_qr_scan:.1f}% (avg), Malicious Clicks: {malicious_clicks}")
+            
+            # Red team assessment summary
+            self.cursor.execute("""
+                SELECT 
+                    AVG(physical_security_score) as avg_physical_score,
+                    AVG(human_security_score) as avg_human_score,
+                    AVG(overall_assessment_score) as avg_overall_score,
+                    COUNT(*) as total_assessments
+                FROM red_team_assessment
+            """)
+            
+            assessment_metrics = self.cursor.fetchone()
+            if assessment_metrics:
+                avg_physical = assessment_metrics['avg_physical_score'] if isinstance(assessment_metrics, dict) else assessment_metrics[0]
+                avg_human = assessment_metrics['avg_human_score'] if isinstance(assessment_metrics, dict) else assessment_metrics[1]
+                avg_overall = assessment_metrics['avg_overall_score'] if isinstance(assessment_metrics, dict) else assessment_metrics[2]
+                total_assessments = assessment_metrics['total_assessments'] if isinstance(assessment_metrics, dict) else assessment_metrics[3]
+                
+                print(f"Red Team Assessments: {total_assessments} completed")
+                print(f"Security Scores - Physical: {avg_physical:.1f}, Human: {avg_human:.1f}, Overall: {avg_overall:.1f}")
+            
+            # Branch distribution
+            self.cursor.execute("""
+                SELECT branch_code, branch_location, COUNT(*) as employee_count
+                FROM employee_master 
+                GROUP BY branch_code, branch_location
+                ORDER BY employee_count DESC
+            """)
+            
+            branch_results = self.cursor.fetchall()
+            if branch_results:
+                print(f"\nBranch Distribution:")
+                for row in branch_results:
+                    if isinstance(row, dict):
+                        print(f"  {row['branch_code']} ({row['branch_location']}): {row['employee_count']} employees")
+                    else:
+                        print(f"  {row[0]} ({row[1]}): {row[2]} employees")
             
         except Exception as e:
             print(f"Error generating statistics: {e}")
@@ -564,7 +926,7 @@ class DatabasePopulator:
     def get_employee_ids(self):
         """Get list of employee IDs"""
         try:
-            self.cursor.execute("SELECT employee_id FROM employees")
+            self.cursor.execute("SELECT employee_id FROM employee_master")
             results = self.cursor.fetchall()
             return [row['employee_id'] if isinstance(row, dict) else row[0] for row in results]
         except Exception as e:
@@ -650,10 +1012,10 @@ def main():
             if populator.generate_employees(num_employees):
                 employee_ids = populator.get_employee_ids()
                 
-                if (populator.generate_security_metrics(employee_ids) and
-                    populator.generate_usb_incidents(employee_ids) and
-                    populator.generate_intrusion_attempts() and
-                    populator.generate_roi_tracking()):
+                if (populator.generate_phish_smish_simulations(employee_ids) and
+                    populator.generate_vishing_simulations(employee_ids) and
+                    populator.generate_quishing_simulations(employee_ids) and
+                    populator.generate_red_team_assessments(employee_ids)):
                     
                     print("\n✓ All data generated successfully!")
                     populator.display_statistics_summary()
