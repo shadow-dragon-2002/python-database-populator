@@ -216,18 +216,82 @@ class DatabasePopulator:
             print("   • For remote PostgreSQL: Check pg_hba.conf and postgresql.conf")
             print("   • Try: psql -h {host} -U {username} -d {database}")
     
+    def _ensure_table_methods_exist(self):
+        """Ensure all table creation methods exist - fallback for debugging"""
+        required_methods = {
+            '_get_employee_master_table_sql': self._get_employee_master_table_sql,
+            '_get_employee_phish_smish_sim_table_sql': self._get_employee_phish_smish_sim_table_sql,
+            '_get_employee_vishing_sim_table_sql': self._get_employee_vishing_sim_table_sql,
+            '_get_employee_quishing_sim_table_sql': self._get_employee_quishing_sim_table_sql,
+            '_get_red_team_assessment_table_sql': self._get_red_team_assessment_table_sql
+        }
+        
+        missing = []
+        for method_name, method_ref in required_methods.items():
+            if not hasattr(self, method_name) or not callable(getattr(self, method_name, None)):
+                missing.append(method_name)
+        
+        if missing:
+            print(f"🔧 Warning: Missing methods detected: {missing}")
+            print("🔧 This might be a Python environment issue.")
+            return False
+        
+        return True
+    
     def create_tables(self):
         """Create all required tables based on the provided ER diagram"""
-        tables = {
-            'employee_master': self._get_employee_master_table_sql(),
-            'employee_phish_smish_sim': self._get_employee_phish_smish_sim_table_sql(),
-            'employee_vishing_sim': self._get_employee_vishing_sim_table_sql(),
-            'employee_quishing_sim': self._get_employee_quishing_sim_table_sql(),
-            'red_team_assessment': self._get_red_team_assessment_table_sql()
-        }
+        # Ensure methods exist before proceeding
+        if not self._ensure_table_methods_exist():
+            print("✗ Error: Required table creation methods are missing")
+            print("💡 Suggestions:")
+            print("   • Restart your Python session")
+            print("   • Clear Python cache files")
+            print("   • Try running: python demo_full_workflow.py")
+            return False
+        
+        # Defensive check for method existence
+        required_methods = [
+            '_get_employee_master_table_sql',
+            '_get_employee_phish_smish_sim_table_sql',
+            '_get_employee_vishing_sim_table_sql',
+            '_get_employee_quishing_sim_table_sql',
+            '_get_red_team_assessment_table_sql'
+        ]
+        
+        missing_methods = []
+        for method_name in required_methods:
+            if not hasattr(self, method_name):
+                missing_methods.append(method_name)
+        
+        if missing_methods:
+            print(f"✗ Error: Missing table creation methods: {missing_methods}")
+            return False
+        
+        tables = {}
+        try:
+            # Build tables dictionary with error handling for each method
+            tables['employee_master'] = self._get_employee_master_table_sql()
+            tables['employee_phish_smish_sim'] = self._get_employee_phish_smish_sim_table_sql()
+            tables['employee_vishing_sim'] = self._get_employee_vishing_sim_table_sql()
+            tables['employee_quishing_sim'] = self._get_employee_quishing_sim_table_sql()
+            tables['red_team_assessment'] = self._get_red_team_assessment_table_sql()
+            
+            print(f"📋 Successfully generated SQL for {len(tables)} tables")
+            
+        except AttributeError as e:
+            print(f"✗ Error: Method not found during table SQL generation: {e}")
+            print(f"✗ Available methods: {[m for m in dir(self) if m.startswith('_get_') and 'table_sql' in m]}")
+            return False
+        except Exception as e:
+            print(f"✗ Error generating table SQL: {e}")
+            return False
         
         try:
             for table_name, sql in tables.items():
+                if not sql or 'CREATE TABLE' not in sql:
+                    print(f"✗ Error: Invalid SQL for table {table_name}")
+                    return False
+                    
                 self.cursor.execute(sql)
                 print(f"✓ Created table: {table_name}")
             
@@ -1096,10 +1160,34 @@ def main():
         
         print(f"\n🎯 Connection successful! Proceeding with database setup...")
         
-        # Create tables
+        # Create tables with detailed error handling
         print(f"\n📋 Creating database tables...")
-        if not populator.create_tables():
-            print("❌ Failed to create tables. Please check the error messages above.")
+        try:
+            # Debug: Show available methods
+            table_methods = [m for m in dir(populator) if m.startswith('_get_') and 'table_sql' in m]
+            print(f"🔍 Available table creation methods: {len(table_methods)}")
+            
+            if not populator.create_tables():
+                print("❌ Failed to create tables. Please check the error messages above.")
+                print("💡 Try running the demo mode: python demo_full_workflow.py")
+                return
+                
+        except AttributeError as e:
+            print(f"❌ Method missing error during table creation: {e}")
+            print("🔧 This might be a code issue. Please try:")
+            print("   • Clear Python cache: find . -name '*.pyc' -delete")
+            print("   • Restart your Python session") 
+            print("   • Try the demo mode: python demo_full_workflow.py")
+            return
+        except Exception as e:
+            print(f"❌ Unexpected error during table creation: {e}")
+            print("🔧 Troubleshooting steps:")
+            print("   • Check if you have CREATE TABLE privileges")
+            print("   • Verify the database exists and is accessible")
+            print("   • Try the demo mode: python demo_full_workflow.py")
+            import traceback
+            print("\n📄 Full error details:")
+            traceback.print_exc()
             return
         
         # Check if data exists
