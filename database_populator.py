@@ -56,6 +56,8 @@ class DatabasePopulator:
     def get_database_config(self):
         """Get database connection details from user"""
         print("=== Database Connection Configuration ===")
+        print("📋 Make sure your database server is running and accessible before proceeding.")
+        print("")
         
         # Get database type
         while True:
@@ -65,20 +67,54 @@ class DatabasePopulator:
                 break
             print("Please enter 'mysql' or 'postgresql'")
         
-        # Get connection details
-        host = input("Enter host (default: localhost): ").strip() or "localhost"
-        
-        if self.db_type == 'mysql':
-            default_port = 3306
-        else:
-            default_port = 5432
+        # Get connection details with validation
+        while True:
+            host = input("Enter host (default: localhost): ").strip() or "localhost"
             
-        port_input = input(f"Enter port (default: {default_port}): ").strip()
-        port = int(port_input) if port_input else default_port
-        
-        database = input("Enter database name: ").strip()
-        username = input("Enter username: ").strip()
-        password = input("Enter password: ").strip()
+            if self.db_type == 'mysql':
+                default_port = 3306
+            else:
+                default_port = 5432
+                
+            port_input = input(f"Enter port (default: {default_port}): ").strip()
+            try:
+                port = int(port_input) if port_input else default_port
+                if port < 1 or port > 65535:
+                    print("❌ Port must be between 1 and 65535")
+                    continue
+            except ValueError:
+                print("❌ Port must be a valid number")
+                continue
+            
+            database = input("Enter database name: ").strip()
+            if not database:
+                print("❌ Database name cannot be empty")
+                continue
+                
+            username = input("Enter username: ").strip()
+            if not username:
+                print("❌ Username cannot be empty")
+                continue
+                
+            password = input("Enter password: ").strip()
+            
+            # Confirmation
+            print(f"\n📋 Connection Details:")
+            print(f"   Type: {self.db_type}")
+            print(f"   Host: {host}")
+            print(f"   Port: {port}")
+            print(f"   Database: {database}")
+            print(f"   Username: {username}")
+            print(f"   Password: {'*' * len(password) if password else '(empty)'}")
+            
+            confirm = input("\nProceed with these settings? (y/n): ").lower().strip()
+            if confirm in ['y', 'yes']:
+                break
+            elif confirm in ['n', 'no']:
+                print("Let's reconfigure...\n")
+                continue
+            else:
+                print("Please enter 'y' for yes or 'n' for no")
         
         return {
             'host': host,
@@ -87,6 +123,11 @@ class DatabasePopulator:
             'username': username,
             'password': password
         }
+    
+    def test_connection(self, config):
+        """Test database connection before proceeding"""
+        print(f"\n🔍 Testing connection to {self.db_type} database...")
+        return self.connect_to_database(config)
     
     def connect_to_database(self, config):
         """Establish database connection"""
@@ -97,7 +138,8 @@ class DatabasePopulator:
                     port=config['port'],
                     database=config['database'],
                     user=config['username'],
-                    password=config['password']
+                    password=config['password'],
+                    connect_timeout=10
                 )
                 self.cursor = self.connection.cursor(dictionary=True)
             else:  # postgresql
@@ -106,7 +148,8 @@ class DatabasePopulator:
                     port=config['port'],
                     database=config['database'],
                     user=config['username'],
-                    password=config['password']
+                    password=config['password'],
+                    connect_timeout=10
                 )
                 self.cursor = self.connection.cursor(cursor_factory=RealDictCursor)
             
@@ -114,8 +157,64 @@ class DatabasePopulator:
             return True
             
         except Exception as e:
-            print(f"✗ Failed to connect to database: {e}")
+            self._handle_connection_error(e, config)
             return False
+    
+    def _handle_connection_error(self, error, config):
+        """Handle database connection errors with helpful troubleshooting information"""
+        error_str = str(error)
+        print(f"✗ Failed to connect to database: {error}")
+        print("\n🔧 Troubleshooting Guide:")
+        
+        if "Access denied" in error_str:
+            print("❌ Authentication Error:")
+            print(f"   • Check if username '{config['username']}' is correct")
+            print("   • Verify the password is correct")
+            print("   • Ensure the user has appropriate database privileges")
+            print("   • For MySQL, try running: GRANT ALL PRIVILEGES ON *.* TO 'username'@'%';")
+            
+        elif "Can't connect" in error_str or "Connection refused" in error_str:
+            print("❌ Connection Error:")
+            print(f"   • Check if database server is running on {config['host']}:{config['port']}")
+            print("   • Verify the host IP address/hostname is correct")
+            print("   • Check firewall settings and network connectivity")
+            print("   • For local testing, try host='localhost' or '127.0.0.1'")
+            
+        elif "Unknown database" in error_str:
+            print("❌ Database Not Found:")
+            print(f"   • Database '{config['database']}' does not exist")
+            print("   • Create the database first or use an existing database name")
+            print(f"   • For MySQL: CREATE DATABASE {config['database']};")
+            
+        elif "timeout" in error_str.lower():
+            print("❌ Connection Timeout:")
+            print("   • Database server might be overloaded or unreachable")
+            print("   • Check network connectivity and server status")
+            print("   • Try increasing connection timeout or retry later")
+            
+        else:
+            print("❌ General Connection Error:")
+            print("   • Verify all connection parameters are correct")
+            print("   • Check database server logs for more details")
+            print("   • Ensure the database service is running and accessible")
+        
+        print(f"\n📋 Current Configuration:")
+        print(f"   • Database Type: {self.db_type}")
+        print(f"   • Host: {config['host']}")
+        print(f"   • Port: {config['port']}")
+        print(f"   • Database: {config['database']}")
+        print(f"   • Username: {config['username']}")
+        print(f"   • Password: {'*' * len(config['password'])}")
+        
+        print(f"\n💡 Quick Solutions:")
+        if self.db_type == 'mysql':
+            print("   • For local MySQL: Use host='localhost', user='root'")
+            print("   • For remote MySQL: Ensure user has remote access privileges")
+            print("   • Try: mysql -h {host} -u {username} -p {database}")
+        else:
+            print("   • For local PostgreSQL: Use host='localhost', user='postgres'")
+            print("   • For remote PostgreSQL: Check pg_hba.conf and postgresql.conf")
+            print("   • Try: psql -h {host} -U {username} -d {database}")
     
     def create_tables(self):
         """Create all required tables based on the provided ER diagram"""
@@ -962,19 +1061,45 @@ def main():
     """Main function"""
     print("FISST Academy Database Populator")
     print("=" * 40)
+    print("🚀 Welcome! This script will help you create and populate a database")
+    print("   with realistic cybersecurity simulation data for FISST Academy.")
+    print("")
     
     populator = DatabasePopulator()
     
     try:
-        # Get database configuration
-        config = populator.get_database_config()
+        # Get database configuration with retry option
+        while True:
+            config = populator.get_database_config()
+            
+            # Test connection first
+            if populator.test_connection(config):
+                break
+            else:
+                print("\n❓ What would you like to do?")
+                print("1. Try different connection settings")
+                print("2. Exit the program")
+                
+                while True:
+                    choice = input("Enter your choice (1 or 2): ").strip()
+                    if choice == '1':
+                        print("\nLet's try again with different settings...\n")
+                        break
+                    elif choice == '2':
+                        print("👋 Exiting. Please check your database configuration and try again.")
+                        return
+                    else:
+                        print("Please enter '1' or '2'")
+                
+                if choice == '2':
+                    return
         
-        # Connect to database
-        if not populator.connect_to_database(config):
-            return
+        print(f"\n🎯 Connection successful! Proceeding with database setup...")
         
         # Create tables
+        print(f"\n📋 Creating database tables...")
         if not populator.create_tables():
+            print("❌ Failed to create tables. Please check the error messages above.")
             return
         
         # Check if data exists
@@ -988,14 +1113,15 @@ def main():
             
             if delete_data:
                 if not populator.delete_all_data():
+                    print("❌ Failed to delete existing data.")
                     return
                 
                 generate_new = get_yes_no_input("Do you want to generate fresh data?")
                 if not generate_new:
-                    print("Data deleted. Exiting...")
+                    print("✅ Data deleted. Exiting...")
                     return
             else:
-                print("Keeping existing data. Exiting...")
+                print("✅ Keeping existing data. Exiting...")
                 return
         
         # Generate data flow
@@ -1029,12 +1155,53 @@ def main():
                 print("\n✗ Employee generation failed")
     
     except KeyboardInterrupt:
-        print("\n\nOperation cancelled by user")
+        print("\n\n👋 Operation cancelled by user")
     except Exception as e:
-        print(f"\nUnexpected error: {e}")
+        print(f"\n❌ Unexpected error: {e}")
+        print("💡 If you continue to have issues:")
+        print("   • Check the troubleshooting guide above")
+        print("   • Verify your database server is running")
+        print("   • Try running the demo mode: python demo_full_workflow.py")
+        print("   • Check the logs for more detailed error information")
     finally:
         populator.close_connection()
 
 
+def show_help():
+    """Show help information"""
+    print("FISST Academy Database Populator - Help")
+    print("=" * 50)
+    print("📖 This script creates and populates 5 database tables with cybersecurity simulation data:")
+    print("   1. employee_master - Employee information")
+    print("   2. employee_phish_smish_sim - Phishing/SMS simulations")
+    print("   3. employee_vishing_sim - Voice phishing simulations")
+    print("   4. employee_quishing_sim - QR code phishing simulations")
+    print("   5. red_team_assessment - Security assessments")
+    print("")
+    print("🔧 Prerequisites:")
+    print("   • MySQL or PostgreSQL database server running")
+    print("   • Database user with CREATE, INSERT, SELECT, DELETE privileges")
+    print("   • Python dependencies installed: pip install -r requirements.txt")
+    print("")
+    print("🚀 Usage:")
+    print("   python database_populator.py          # Interactive mode")
+    print("   python demo_full_workflow.py          # Demo with SQLite (no database setup needed)")
+    print("   python validate_script.py             # Validate functionality without database")
+    print("")
+    print("❓ Having connection issues?")
+    print("   • Use 'localhost' for local databases")
+    print("   • Ensure database server is running and accessible")
+    print("   • Check firewall settings for remote connections")
+    print("   • Verify user privileges and database existence")
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] in ['--help', '-h', 'help']:
+        show_help()
+    else:
+        print("💡 Need help? Run: python database_populator.py --help")
+        print("🧪 Want to try without database setup? Run: python demo_full_workflow.py")
+        print("")
+        main()
