@@ -238,8 +238,61 @@ class DatabasePopulator:
         
         return True
     
+    def check_table_exists(self, table_name):
+        """Check if a specific table exists"""
+        try:
+            if self.db_type == 'mysql':
+                self.cursor.execute(f"SHOW TABLES LIKE '{table_name}'")
+            else:  # postgresql
+                self.cursor.execute(f"""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = '{table_name}'
+                    )
+                """)
+            result = self.cursor.fetchone()
+            if self.db_type == 'mysql':
+                return result is not None
+            else:
+                return result[0] if result else False
+        except Exception:
+            return False
+
+    def get_missing_tables(self):
+        """Get list of tables that don't exist"""
+        required_tables = [
+            'employee_master',
+            'employee_phish_smish_sim', 
+            'employee_vishing_sim',
+            'employee_quishing_sim',
+            'red_team_assessment'
+        ]
+        
+        missing_tables = []
+        existing_tables = []
+        
+        for table in required_tables:
+            if self.check_table_exists(table):
+                existing_tables.append(table)
+            else:
+                missing_tables.append(table)
+        
+        return missing_tables, existing_tables
+
     def create_tables(self):
         """Create all required tables based on the provided ER diagram"""
+        # Check which tables already exist
+        missing_tables, existing_tables = self.get_missing_tables()
+        
+        if existing_tables:
+            print(f"📋 Found existing tables: {', '.join(existing_tables)}")
+        
+        if not missing_tables:
+            print("✓ All required tables already exist! Skipping table creation.")
+            return True
+        
+        print(f"📋 Creating missing tables: {', '.join(missing_tables)}")
+        
         # Ensure methods exist before proceeding
         if not self._ensure_table_methods_exist():
             print("✗ Error: Required table creation methods are missing")
@@ -249,34 +302,23 @@ class DatabasePopulator:
             print("   • Try running: python demo_full_workflow.py")
             return False
         
-        # Defensive check for method existence
-        required_methods = [
-            '_get_employee_master_table_sql',
-            '_get_employee_phish_smish_sim_table_sql',
-            '_get_employee_vishing_sim_table_sql',
-            '_get_employee_quishing_sim_table_sql',
-            '_get_red_team_assessment_table_sql'
-        ]
-        
-        missing_methods = []
-        for method_name in required_methods:
-            if not hasattr(self, method_name):
-                missing_methods.append(method_name)
-        
-        if missing_methods:
-            print(f"✗ Error: Missing table creation methods: {missing_methods}")
-            return False
-        
+        # Build only the missing tables
         tables = {}
+        table_methods = {
+            'employee_master': self._get_employee_master_table_sql,
+            'employee_phish_smish_sim': self._get_employee_phish_smish_sim_table_sql,
+            'employee_vishing_sim': self._get_employee_vishing_sim_table_sql,
+            'employee_quishing_sim': self._get_employee_quishing_sim_table_sql,
+            'red_team_assessment': self._get_red_team_assessment_table_sql
+        }
+        
         try:
-            # Build tables dictionary with error handling for each method
-            tables['employee_master'] = self._get_employee_master_table_sql()
-            tables['employee_phish_smish_sim'] = self._get_employee_phish_smish_sim_table_sql()
-            tables['employee_vishing_sim'] = self._get_employee_vishing_sim_table_sql()
-            tables['employee_quishing_sim'] = self._get_employee_quishing_sim_table_sql()
-            tables['red_team_assessment'] = self._get_red_team_assessment_table_sql()
+            # Build tables dictionary only for missing tables
+            for table_name in missing_tables:
+                if table_name in table_methods:
+                    tables[table_name] = table_methods[table_name]()
             
-            print(f"📋 Successfully generated SQL for {len(tables)} tables")
+            print(f"📋 Successfully generated SQL for {len(tables)} missing tables")
             
         except AttributeError as e:
             print(f"✗ Error: Method not found during table SQL generation: {e}")
@@ -286,24 +328,37 @@ class DatabasePopulator:
             print(f"✗ Error generating table SQL: {e}")
             return False
         
+        # Create tables in the correct order to respect foreign key dependencies
+        table_order = ['employee_master', 'employee_phish_smish_sim', 'employee_vishing_sim', 'employee_quishing_sim', 'red_team_assessment']
+        
         try:
-            for table_name, sql in tables.items():
-                if not sql or 'CREATE TABLE' not in sql:
-                    print(f"✗ Error: Invalid SQL for table {table_name}")
-                    return False
-                    
-                self.cursor.execute(sql)
-                print(f"✓ Created table: {table_name}")
+            created_count = 0
+            for table_name in table_order:
+                if table_name in tables:
+                    sql = tables[table_name]
+                    if not sql or 'CREATE TABLE' not in sql:
+                        print(f"✗ Error: Invalid SQL for table {table_name}")
+                        return False
+                        
+                    self.cursor.execute(sql)
+                    print(f"✓ Created table: {table_name}")
+                    created_count += 1
             
             self.connection.commit()
-            print("✓ All tables created successfully!")
+            
+            if created_count > 0:
+                print(f"✓ Successfully created {created_count} new tables!")
+            
+            return True
             
         except Exception as e:
             print(f"✗ Error creating tables: {e}")
+            print("💡 Common solutions:")
+            print("   • Check if user has CREATE TABLE privileges")
+            print("   • Verify database character set compatibility") 
+            print("   • Try dropping existing tables if they have conflicting structure")
             self.connection.rollback()
             return False
-        
-        return True
     
     def _get_employee_master_table_sql(self):
         """SQL for employee_master table based on ER diagram"""
@@ -311,7 +366,7 @@ class DatabasePopulator:
             return """
             CREATE TABLE IF NOT EXISTS employee_master (
                 serial_no INT AUTO_INCREMENT PRIMARY KEY,
-                employee_id VARCHAR(20) UNIQUE NOT NULL,
+                employee_id VARCHAR(20) UNIQUE NOT NULL COLLATE utf8mb4_unicode_ci,
                 first_name VARCHAR(50) NOT NULL,
                 last_name VARCHAR(50) NOT NULL,
                 gender CHAR(1),
@@ -375,7 +430,7 @@ class DatabasePopulator:
                 assessor_id VARCHAR(20),
                 notes VARCHAR(255),
                 red_team_testing_status VARCHAR(20)
-            )
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """
         else:  # postgresql
             return """
@@ -450,106 +505,165 @@ class DatabasePopulator:
     
     def _get_employee_phish_smish_sim_table_sql(self):
         """SQL for employee_phish_smish_sim table"""
-        common_sql = """
-        CREATE TABLE IF NOT EXISTS employee_phish_smish_sim (
-            sim_id {} PRIMARY KEY,
-            employee_id VARCHAR(20) NOT NULL,
-            simulation_type VARCHAR(50),
-            work_email VARCHAR(100),
-            personal_email VARCHAR(100),
-            click_response_rate DECIMAL(5,2),
-            testing_status VARCHAR(20),
-            FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
-        )
-        """
-        
         if self.db_type == 'mysql':
-            return common_sql.format("INT AUTO_INCREMENT")
-        else:
-            return common_sql.format("SERIAL")
+            return """
+            CREATE TABLE IF NOT EXISTS employee_phish_smish_sim (
+                sim_id INT AUTO_INCREMENT PRIMARY KEY,
+                employee_id VARCHAR(20) NOT NULL COLLATE utf8mb4_unicode_ci,
+                simulation_type VARCHAR(50),
+                work_email VARCHAR(100),
+                personal_email VARCHAR(100),
+                click_response_rate DECIMAL(5,2),
+                testing_status VARCHAR(20),
+                FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
+        else:  # postgresql
+            return """
+            CREATE TABLE IF NOT EXISTS employee_phish_smish_sim (
+                sim_id SERIAL PRIMARY KEY,
+                employee_id VARCHAR(20) NOT NULL,
+                simulation_type VARCHAR(50),
+                work_email VARCHAR(100),
+                personal_email VARCHAR(100),
+                click_response_rate DECIMAL(5,2),
+                testing_status VARCHAR(20),
+                FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+            )
+            """
     
     def _get_employee_vishing_sim_table_sql(self):
         """SQL for employee_vishing_sim table"""
-        common_sql = """
-        CREATE TABLE IF NOT EXISTS employee_vishing_sim (
-            sim_id {} PRIMARY KEY,
-            employee_id VARCHAR(20) NOT NULL,
-            phone_number VARCHAR(20),
-            alt_phone_number VARCHAR(20),
-            vish_response_rate DECIMAL(5,2),
-            testing_status VARCHAR(20),
-            FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
-        )
-        """
-        
         if self.db_type == 'mysql':
-            return common_sql.format("INT AUTO_INCREMENT")
-        else:
-            return common_sql.format("SERIAL")
+            return """
+            CREATE TABLE IF NOT EXISTS employee_vishing_sim (
+                sim_id INT AUTO_INCREMENT PRIMARY KEY,
+                employee_id VARCHAR(20) NOT NULL COLLATE utf8mb4_unicode_ci,
+                phone_number VARCHAR(20),
+                alt_phone_number VARCHAR(20),
+                vish_response_rate DECIMAL(5,2),
+                testing_status VARCHAR(20),
+                FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
+        else:  # postgresql
+            return """
+            CREATE TABLE IF NOT EXISTS employee_vishing_sim (
+                sim_id SERIAL PRIMARY KEY,
+                employee_id VARCHAR(20) NOT NULL,
+                phone_number VARCHAR(20),
+                alt_phone_number VARCHAR(20),
+                vish_response_rate DECIMAL(5,2),
+                testing_status VARCHAR(20),
+                FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+            )
+            """
     
     def _get_employee_quishing_sim_table_sql(self):
         """SQL for employee_quishing_sim table (QR code phishing)"""
-        common_sql = """
-        CREATE TABLE IF NOT EXISTS employee_quishing_sim (
-            sim_id {} PRIMARY KEY,
-            employee_id VARCHAR(20) NOT NULL,
-            qr_code_type VARCHAR(50),
-            qr_scan_rate DECIMAL(5,2),
-            malicious_qr_clicked BOOLEAN,
-            device_type VARCHAR(50),
-            testing_status VARCHAR(20),
-            simulation_date DATE,
-            FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
-        )
-        """
-        
         if self.db_type == 'mysql':
-            return common_sql.format("INT AUTO_INCREMENT")
-        else:
-            return common_sql.format("SERIAL")
+            return """
+            CREATE TABLE IF NOT EXISTS employee_quishing_sim (
+                sim_id INT AUTO_INCREMENT PRIMARY KEY,
+                employee_id VARCHAR(20) NOT NULL COLLATE utf8mb4_unicode_ci,
+                qr_code_type VARCHAR(50),
+                qr_scan_rate DECIMAL(5,2),
+                malicious_qr_clicked BOOLEAN,
+                device_type VARCHAR(50),
+                testing_status VARCHAR(20),
+                simulation_date DATE,
+                FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
+        else:  # postgresql
+            return """
+            CREATE TABLE IF NOT EXISTS employee_quishing_sim (
+                sim_id SERIAL PRIMARY KEY,
+                employee_id VARCHAR(20) NOT NULL,
+                qr_code_type VARCHAR(50),
+                qr_scan_rate DECIMAL(5,2),
+                malicious_qr_clicked BOOLEAN,
+                device_type VARCHAR(50),
+                testing_status VARCHAR(20),
+                simulation_date DATE,
+                FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+            )
+            """
     
     def _get_red_team_assessment_table_sql(self):
         """SQL for red_team_assessment table"""
-        common_sql = """
-        CREATE TABLE IF NOT EXISTS red_team_assessment (
-            assess_id {} PRIMARY KEY,
-            employee_id VARCHAR(20) NOT NULL,
-            branch_code VARCHAR(10),
-            local_employees_at_branch INT,
-            security_level VARCHAR(20),
-            building_storeys INT,
-            assessment_date DATE,
-            assessment_time_start TIME,
-            assessment_time_end TIME,
-            permission_granted BOOLEAN,
-            approving_official_name VARCHAR(100),
-            approving_official_designation VARCHAR(50),
-            identity_verification_required BOOLEAN,
-            identity_verified BOOLEAN,
-            security_guard_present BOOLEAN,
-            visitor_log_maintained BOOLEAN,
-            badge_issued BOOLEAN,
-            escort_required BOOLEAN,
-            restricted_areas_accessed BOOLEAN,
-            tailgating_possible BOOLEAN,
-            social_engineering_successful BOOLEAN,
-            physical_security_score DECIMAL(5,1),
-            human_security_score DECIMAL(5,1),
-            overall_assessment_score DECIMAL(5,1),
-            vulnerabilities_found VARCHAR(255),
-            recommendations VARCHAR(255),
-            assessor_name VARCHAR(100),
-            assessor_id VARCHAR(20),
-            notes VARCHAR(255),
-            testing_status VARCHAR(20),
-            FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
-        )
-        """
-        
         if self.db_type == 'mysql':
-            return common_sql.format("INT AUTO_INCREMENT")
-        else:
-            return common_sql.format("SERIAL")
+            return """
+            CREATE TABLE IF NOT EXISTS red_team_assessment (
+                assess_id INT AUTO_INCREMENT PRIMARY KEY,
+                employee_id VARCHAR(20) NOT NULL COLLATE utf8mb4_unicode_ci,
+                branch_code VARCHAR(10),
+                local_employees_at_branch INT,
+                security_level VARCHAR(20),
+                building_storeys INT,
+                assessment_date DATE,
+                assessment_time_start TIME,
+                assessment_time_end TIME,
+                permission_granted BOOLEAN,
+                approving_official_name VARCHAR(100),
+                approving_official_designation VARCHAR(50),
+                identity_verification_required BOOLEAN,
+                identity_verified BOOLEAN,
+                security_guard_present BOOLEAN,
+                visitor_log_maintained BOOLEAN,
+                badge_issued BOOLEAN,
+                escort_required BOOLEAN,
+                restricted_areas_accessed BOOLEAN,
+                tailgating_possible BOOLEAN,
+                social_engineering_successful BOOLEAN,
+                physical_security_score DECIMAL(5,1),
+                human_security_score DECIMAL(5,1),
+                overall_assessment_score DECIMAL(5,1),
+                vulnerabilities_found VARCHAR(255),
+                recommendations VARCHAR(255),
+                assessor_name VARCHAR(100),
+                assessor_id VARCHAR(20),
+                notes VARCHAR(255),
+                testing_status VARCHAR(20),
+                FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
+        else:  # postgresql
+            return """
+            CREATE TABLE IF NOT EXISTS red_team_assessment (
+                assess_id SERIAL PRIMARY KEY,
+                employee_id VARCHAR(20) NOT NULL,
+                branch_code VARCHAR(10),
+                local_employees_at_branch INT,
+                security_level VARCHAR(20),
+                building_storeys INT,
+                assessment_date DATE,
+                assessment_time_start TIME,
+                assessment_time_end TIME,
+                permission_granted BOOLEAN,
+                approving_official_name VARCHAR(100),
+                approving_official_designation VARCHAR(50),
+                identity_verification_required BOOLEAN,
+                identity_verified BOOLEAN,
+                security_guard_present BOOLEAN,
+                visitor_log_maintained BOOLEAN,
+                badge_issued BOOLEAN,
+                escort_required BOOLEAN,
+                restricted_areas_accessed BOOLEAN,
+                tailgating_possible BOOLEAN,
+                social_engineering_successful BOOLEAN,
+                physical_security_score DECIMAL(5,1),
+                human_security_score DECIMAL(5,1),
+                overall_assessment_score DECIMAL(5,1),
+                vulnerabilities_found VARCHAR(255),
+                recommendations VARCHAR(255),
+                assessor_name VARCHAR(100),
+                assessor_id VARCHAR(20),
+                notes VARCHAR(255),
+                testing_status VARCHAR(20),
+                FOREIGN KEY (employee_id) REFERENCES employee_master(employee_id) ON DELETE CASCADE
+            )
+            """
     
     def check_data_exists(self):
         """Check if data exists in any of the tables"""
@@ -582,8 +696,34 @@ class DatabasePopulator:
             self.connection.rollback()
             return False
     
+    def generate_consistent_statistics(self, num_employees):
+        """Generate consistent statistics regardless of employee count"""
+        # Use a consistent seed based on a fixed value to ensure reproducible statistics
+        # This ensures that statistics remain approximately the same regardless of employee count
+        import random as stats_random
+        stats_random.seed(42)  # Fixed seed for consistent results
+        
+        # Base percentages that should remain consistent
+        base_stats = {
+            'phishing_click_rate': 22.5,  # Average around 22.5%
+            'vishing_response_rate': 25.5,  # Average around 25.5%
+            'quishing_scan_rate': 24.0,   # Average around 24.0%
+            'physical_security_score': 7.5,  # Average around 7.5/10
+            'human_security_score': 8.0,    # Average around 8.0/10
+        }
+        
+        # Generate slight variations around base values
+        variations = {}
+        for key, base_value in base_stats.items():
+            variation = stats_random.uniform(-2.0, 2.0)  # ±2% variation
+            variations[key] = max(0, min(100, base_value + variation))
+        
+        return variations
+    
     def generate_employees(self, num_employees):
         """Generate employee master data based on ER diagram"""
+        # Get consistent statistics for this run
+        consistent_stats = self.generate_consistent_statistics(num_employees)
         departments = ['IT Security', 'Human Resources', 'Finance', 'Operations', 'Marketing', 'Sales', 'Research', 'Admin']
         designations = ['Analyst', 'Manager', 'Coordinator', 'Specialist', 'Executive', 'Director', 'Team Lead', 'Senior Analyst']
         blood_groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -641,17 +781,19 @@ class DatabasePopulator:
             family_details = f"Family of {random.randint(2, 6)} members"
             medical_conditions = random.choice(['None', 'Diabetes', 'Hypertension', 'Asthma', 'None', 'None'])  # Most have None
             
-            # Simulation data - baseline values
+            # Use consistent statistics with small individual variations
             simulation_type = 'Baseline Assessment'
-            click_response_rate = random.uniform(21, 25)  # Updated: 21-25% for phishing baseline
+            base_click_rate = consistent_stats['phishing_click_rate']
+            click_response_rate = random.uniform(base_click_rate - 1, base_click_rate + 1)  # Small individual variation
             phish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
             phish_testing_status = 'Completed'
             
-            # Vishing data
+            # Vishing data with consistent stats
             vishing_phone_number = phone_number
             vishing_alt_phone_number = self.fake.indian_phone()
             voice_auth_test = random.choice([True, False])
-            vish_response_rate = random.uniform(23, 28)  # Updated: 23-28% for vishing baseline
+            base_vish_rate = consistent_stats['vishing_response_rate']
+            vish_response_rate = random.uniform(base_vish_rate - 1, base_vish_rate + 1)  # Small individual variation
             vish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
             vish_testing_status = 'Completed'
             
@@ -682,9 +824,11 @@ class DatabasePopulator:
             tailgating_possible = random.choice([True, False])
             social_engineering_successful = random.choice([True, False])
             
-            # Scores (post-intervention should be higher)
-            physical_security_score = random.uniform(6.0, 9.0)
-            human_security_score = random.uniform(7.0, 9.5)
+            # Use consistent scores with small variations
+            base_physical = consistent_stats['physical_security_score']
+            base_human = consistent_stats['human_security_score']
+            physical_security_score = random.uniform(base_physical - 0.5, base_physical + 0.5)
+            human_security_score = random.uniform(base_human - 0.5, base_human + 0.5)
             overall_assessment_score = (physical_security_score + human_security_score) / 2
             
             # Assessment details
@@ -751,6 +895,10 @@ class DatabasePopulator:
     
     def generate_phish_smish_simulations(self, employee_ids):
         """Generate phishing/smishing simulation data"""
+        # Get consistent statistics
+        consistent_stats = self.generate_consistent_statistics(len(employee_ids))
+        base_click_rate = consistent_stats['phishing_click_rate']
+        
         sim_data = []
         simulation_types = ['Email Phishing', 'SMS Phishing', 'Social Media Phishing']
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
@@ -762,8 +910,8 @@ class DatabasePopulator:
                 work_email = f"{employee_id.lower().replace('fisst', 'emp')}@fisst.edu"
                 personal_email = f"{employee_id.lower().replace('fisst', 'emp')}@gmail.com"
                 
-                # Updated failure rates: 21-25% for phishing/smishing simulations
-                click_response_rate = random.uniform(21, 25)
+                # Use consistent statistics with small individual variations
+                click_response_rate = random.uniform(base_click_rate - 1.5, base_click_rate + 1.5)
                 
                 sim_data.append((
                     employee_id,
@@ -792,6 +940,10 @@ class DatabasePopulator:
     
     def generate_vishing_simulations(self, employee_ids):
         """Generate vishing (voice phishing) simulation data"""
+        # Get consistent statistics
+        consistent_stats = self.generate_consistent_statistics(len(employee_ids))
+        base_vish_rate = consistent_stats['vishing_response_rate']
+        
         sim_data = []
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
         
@@ -801,8 +953,8 @@ class DatabasePopulator:
                 phone_number = self.fake.indian_phone()
                 alt_phone_number = self.fake.indian_phone()
                 
-                # Updated failure rates: 26-30% for vishing simulations  
-                vish_response_rate = random.uniform(26, 30)
+                # Use consistent statistics with small individual variations
+                vish_response_rate = random.uniform(base_vish_rate - 1.5, base_vish_rate + 1.5)
                 
                 sim_data.append((
                     employee_id,
@@ -830,6 +982,10 @@ class DatabasePopulator:
     
     def generate_quishing_simulations(self, employee_ids):
         """Generate quishing (QR code phishing) simulation data"""
+        # Get consistent statistics
+        consistent_stats = self.generate_consistent_statistics(len(employee_ids))
+        base_qr_scan_rate = consistent_stats['quishing_scan_rate']
+        
         sim_data = []
         qr_code_types = ['Payment QR', 'WiFi QR', 'App Download QR', 'Survey QR', 'Menu QR', 'Contact QR']
         device_types = ['Mobile Phone', 'Tablet', 'Laptop', 'Desktop']
@@ -840,8 +996,8 @@ class DatabasePopulator:
             for _ in range(random.randint(1, 2)):
                 qr_code_type = random.choice(qr_code_types)
                 
-                # Updated failure rates: 22-27% for quishing (QR code) simulations
-                qr_scan_rate = random.uniform(22, 27)
+                # Use consistent statistics with small individual variations
+                qr_scan_rate = random.uniform(base_qr_scan_rate - 1.5, base_qr_scan_rate + 1.5)
                 malicious_qr_clicked = random.choice([True, False])
                 device_type = random.choice(device_types)
                 testing_status = random.choice(testing_statuses)
