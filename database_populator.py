@@ -478,7 +478,7 @@ class DatabasePopulator:
             
             # Simulation data - baseline values
             simulation_type = 'Baseline Assessment'
-            click_response_rate = random.uniform(20, 24)  # Baseline ~22%
+            click_response_rate = random.uniform(21, 25)  # Updated: 21-25% for phishing baseline
             phish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
             phish_testing_status = 'Completed'
             
@@ -486,7 +486,7 @@ class DatabasePopulator:
             vishing_phone_number = phone_number
             vishing_alt_phone_number = self.fake.indian_phone()
             voice_auth_test = random.choice([True, False])
-            vish_response_rate = random.uniform(15, 25)  # Baseline vishing response
+            vish_response_rate = random.uniform(23, 28)  # Updated: 23-28% for vishing baseline
             vish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
             vish_testing_status = 'Completed'
             
@@ -597,8 +597,8 @@ class DatabasePopulator:
                 work_email = f"{employee_id.lower().replace('fisst', 'emp')}@fisst.edu"
                 personal_email = f"{employee_id.lower().replace('fisst', 'emp')}@gmail.com"
                 
-                # Baseline: ~22% click rate, Post-intervention: ~5% click rate
-                click_response_rate = random.uniform(20, 24) if random.random() < 0.6 else random.uniform(3, 7)
+                # Updated failure rates: 21-25% for phishing/smishing simulations
+                click_response_rate = random.uniform(21, 25)
                 
                 sim_data.append((
                     employee_id,
@@ -636,8 +636,8 @@ class DatabasePopulator:
                 phone_number = self.fake.indian_phone()
                 alt_phone_number = self.fake.indian_phone()
                 
-                # Vishing response rate (similar pattern to phishing)
-                vish_response_rate = random.uniform(18, 28) if random.random() < 0.6 else random.uniform(2, 8)
+                # Updated failure rates: 26-30% for vishing simulations  
+                vish_response_rate = random.uniform(26, 30)
                 
                 sim_data.append((
                     employee_id,
@@ -675,8 +675,8 @@ class DatabasePopulator:
             for _ in range(random.randint(1, 2)):
                 qr_code_type = random.choice(qr_code_types)
                 
-                # QR scan and click rates (similar pattern to phishing)
-                qr_scan_rate = random.uniform(15, 30) if random.random() < 0.6 else random.uniform(2, 8)
+                # Updated failure rates: 22-27% for quishing (QR code) simulations
+                qr_scan_rate = random.uniform(22, 27)
                 malicious_qr_clicked = random.choice([True, False])
                 device_type = random.choice(device_types)
                 testing_status = random.choice(testing_statuses)
