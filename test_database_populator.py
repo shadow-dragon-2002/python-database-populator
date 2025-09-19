@@ -55,15 +55,15 @@ class TestDatabasePopulator(unittest.TestCase):
         """Test SQL generation for different database types"""
         # Test MySQL SQL generation
         self.populator.db_type = 'mysql'
-        employees_sql = self.populator._get_employees_table_sql()
+        employees_sql = self.populator._get_employee_master_table_sql()
         self.assertIn('AUTO_INCREMENT', employees_sql)
-        self.assertIn('TIMESTAMP DEFAULT CURRENT_TIMESTAMP', employees_sql)
+        self.assertIn('ENGINE=InnoDB', employees_sql)
         
         # Test PostgreSQL SQL generation
         self.populator.db_type = 'postgresql'
-        employees_sql = self.populator._get_employees_table_sql()
+        employees_sql = self.populator._get_employee_master_table_sql()
         self.assertIn('SERIAL', employees_sql)
-        self.assertIn('TIMESTAMP DEFAULT CURRENT_TIMESTAMP', employees_sql)
+        self.assertIn('employee_id INT UNIQUE', employees_sql)
     
     def test_get_yes_no_input_mock(self):
         """Test yes/no input function with mocked input"""
