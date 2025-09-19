@@ -323,10 +323,10 @@ class DatabasePopulator:
             
             # Generate unique emails
             base_work_email = f"{first_name.lower()}.{last_name.lower()}"
-            work_email = f"{base_work_email}@fisst.edu"
+            work_email = f"{base_work_email}@fisstacademy.com"
             counter = 1
             while work_email in used_emails:
-                work_email = f"{base_work_email}{counter}@fisst.edu"
+                work_email = f"{base_work_email}{counter}@fisstacademy.com"
                 counter += 1
             used_emails.add(work_email)
             
@@ -507,7 +507,7 @@ class DatabasePopulator:
             # Generate multiple simulation entries per employee
             for _ in range(random.randint(2, 4)):
                 simulation_type = random.choice(simulation_types)
-                work_email = f"emp{employee_id}@fisst.edu"
+                work_email = f"emp{employee_id}@fisstacademy.com"
                 personal_email = f"emp{employee_id}@gmail.com"
                 phone_number = self.fake.indian_phone()
                 
