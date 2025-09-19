@@ -84,7 +84,10 @@ class SimpleDatabasePopulator:
                 user=username,
                 password=password,
                 autocommit=False,
-                buffered=True  # This helps prevent unread result errors
+                buffered=True,  # This helps prevent unread result errors
+                use_unicode=True,
+                charset='utf8mb4',
+                collation='utf8mb4_unicode_ci'
             )
             self.cursor = self.connection.cursor(dictionary=True, buffered=True)
             print("✓ Successfully connected to MySQL database!")
