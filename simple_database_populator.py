@@ -83,9 +83,10 @@ class SimpleDatabasePopulator:
                 database=database,
                 user=username,
                 password=password,
-                autocommit=False
+                autocommit=False,
+                buffered=True  # This helps prevent unread result errors
             )
-            self.cursor = self.connection.cursor(dictionary=True)
+            self.cursor = self.connection.cursor(dictionary=True, buffered=True)
             print("✓ Successfully connected to MySQL database!")
             return True
         except Exception as e:
@@ -467,44 +468,68 @@ class SimpleDatabasePopulator:
         """Display data statistics"""
         print("\n=== Data Statistics ===")
         
-        # Employee count
-        self.cursor.execute("SELECT COUNT(*) as count FROM employee_master")
-        emp_count = self.cursor.fetchone()['count']
-        print(f"Employees: {emp_count}")
-        
-        # Simulation counts
-        tables = [
-            ('Phishing Simulations', 'employee_phish_smish_sim'),
-            ('Vishing Simulations', 'employee_vishing_sim'),
-            ('Quishing Simulations', 'employee_quishing_sim'),
-            ('Red Team Assessments', 'red_team_assessment')
-        ]
-        
-        for name, table in tables:
-            self.cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
-            count = self.cursor.fetchone()['count']
-            print(f"{name}: {count}")
-        
-        # Average response rates
-        self.cursor.execute("SELECT AVG(click_response_rate) as avg_rate FROM employee_master")
-        phish_avg = self.cursor.fetchone()['avg_rate']
-        print(f"Average Phishing Response Rate: {phish_avg:.1f}%")
-        
-        self.cursor.execute("SELECT AVG(vish_response_rate) as avg_rate FROM employee_master")
-        vish_avg = self.cursor.fetchone()['avg_rate']
-        print(f"Average Vishing Response Rate: {vish_avg:.1f}%")
-        
-        self.cursor.execute("SELECT AVG(quish_response_rate) as avg_rate FROM employee_master")
-        quish_avg = self.cursor.fetchone()['avg_rate']
-        print(f"Average Quishing Response Rate: {quish_avg:.1f}%")
+        try:
+            # Employee count
+            self.cursor.execute("SELECT COUNT(*) as count FROM employee_master")
+            result = self.cursor.fetchone()
+            emp_count = result['count'] if result else 0
+            print(f"Employees: {emp_count}")
+            
+            # Simulation counts
+            tables = [
+                ('Phishing Simulations', 'employee_phish_smish_sim'),
+                ('Vishing Simulations', 'employee_vishing_sim'),
+                ('Quishing Simulations', 'employee_quishing_sim'),
+                ('Red Team Assessments', 'red_team_assessment')
+            ]
+            
+            for name, table in tables:
+                self.cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
+                result = self.cursor.fetchone()
+                count = result['count'] if result else 0
+                print(f"{name}: {count}")
+            
+            # Average response rates
+            self.cursor.execute("SELECT AVG(click_response_rate) as avg_rate FROM employee_master")
+            result = self.cursor.fetchone()
+            phish_avg = result['avg_rate'] if result and result['avg_rate'] else 0
+            print(f"Average Phishing Response Rate: {phish_avg:.1f}%")
+            
+            self.cursor.execute("SELECT AVG(vish_response_rate) as avg_rate FROM employee_master")
+            result = self.cursor.fetchone()
+            vish_avg = result['avg_rate'] if result and result['avg_rate'] else 0
+            print(f"Average Vishing Response Rate: {vish_avg:.1f}%")
+            
+            self.cursor.execute("SELECT AVG(quish_response_rate) as avg_rate FROM employee_master")
+            result = self.cursor.fetchone()
+            quish_avg = result['avg_rate'] if result and result['avg_rate'] else 0
+            print(f"Average Quishing Response Rate: {quish_avg:.1f}%")
+            
+        except Exception as e:
+            print(f"Error displaying statistics: {e}")
+            # Clear any unread results
+            try:
+                while self.cursor.nextset():
+                    pass
+            except:
+                pass
     
     def close_connection(self):
         """Close database connection"""
-        if self.cursor:
-            self.cursor.close()
-        if self.connection:
-            self.connection.close()
-        print("\n✓ Database connection closed")
+        try:
+            if self.cursor:
+                # Handle any unread results
+                try:
+                    while self.cursor.nextset():
+                        pass
+                except:
+                    pass
+                self.cursor.close()
+            if self.connection:
+                self.connection.close()
+            print("\n✓ Database connection closed")
+        except Exception as e:
+            print(f"\n⚠️  Warning during connection cleanup: {e}")
 
 
 def main():
@@ -525,7 +550,7 @@ def main():
         
         # Check for existing data
         print("\n=== Data Management ===")
-        if populator.cursor.execute("SELECT COUNT(*) as count FROM employee_master") or True:
+        try:
             populator.cursor.execute("SELECT COUNT(*) as count FROM employee_master")
             existing_count = populator.cursor.fetchone()['count']
             if existing_count > 0:
@@ -534,6 +559,9 @@ def main():
                 if clear_data == 'y':
                     if not populator.clear_existing_data():
                         return
+        except Exception as e:
+            print(f"Error checking existing data: {e}")
+            return
         
         # Get number of employees
         while True:
