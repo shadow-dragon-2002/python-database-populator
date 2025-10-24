@@ -782,11 +782,15 @@ class DatabasePopulator:
             medical_conditions = random.choice(['None', 'Diabetes', 'Hypertension', 'Asthma', 'None', 'None'])  # Most have None
             
             # Use consistent statistics with small individual variations
-            simulation_type = 'Baseline Assessment'
+            # Simulation type aligned with test types - evenly distributed
+            simulation_types = ['Phishing Test', 'Vishing Test', 'Quishing Test', 'Red Team Assessment']
+            simulation_type = simulation_types[i % len(simulation_types)]
             base_click_rate = consistent_stats['phishing_click_rate']
             click_response_rate = random.uniform(base_click_rate - 1, base_click_rate + 1)  # Small individual variation
             phish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
-            phish_testing_status = 'Completed'
+            # Even distribution of testing statuses
+            phish_testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
+            phish_testing_status = phish_testing_statuses[i % len(phish_testing_statuses)]
             
             # Vishing data with consistent stats
             vishing_phone_number = phone_number
@@ -795,7 +799,9 @@ class DatabasePopulator:
             base_vish_rate = consistent_stats['vishing_response_rate']
             vish_response_rate = random.uniform(base_vish_rate - 1, base_vish_rate + 1)  # Small individual variation
             vish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
-            vish_testing_status = 'Completed'
+            # Even distribution of testing statuses
+            vish_testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
+            vish_testing_status = vish_testing_statuses[i % len(vish_testing_statuses)]
             
             # Branch and assessment data
             branch_idx = i % len(branch_codes)
@@ -844,7 +850,9 @@ class DatabasePopulator:
             assessor_name = self.fake.indian_name()
             assessor_id = f"ASST{random.randint(1, 20):02d}"
             notes = f"Assessment completed for {department} department employee"
-            red_team_testing_status = 'Completed'
+            # Even distribution of testing statuses
+            red_team_testing_statuses = ['Completed', 'In Progress', 'Scheduled', 'Cancelled']
+            red_team_testing_status = red_team_testing_statuses[i % len(red_team_testing_statuses)]
             
             employees_data.append((
                 employee_id, first_name, last_name, gender, date_of_birth, age, blood_group, marital_status,
@@ -900,8 +908,13 @@ class DatabasePopulator:
         base_click_rate = consistent_stats['phishing_click_rate']
         
         sim_data = []
+        # Simulation types aligned with test type (phishing/smishing)
         simulation_types = ['Email Phishing', 'SMS Phishing', 'Social Media Phishing']
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
+        
+        # Track indices for even distribution
+        sim_type_idx = 0
+        status_idx = 0
         
         for employee_id in employee_ids:
             # Generate multiple simulation entries per employee
@@ -913,14 +926,22 @@ class DatabasePopulator:
                 # Use consistent statistics with small individual variations
                 click_response_rate = random.uniform(base_click_rate - 1.5, base_click_rate + 1.5)
                 
+                # Use round-robin selection for even distribution
+                sim_type = simulation_types[sim_type_idx % len(simulation_types)]
+                test_status = testing_statuses[status_idx % len(testing_statuses)]
+                
                 sim_data.append((
                     employee_id,
-                    random.choice(simulation_types),
+                    sim_type,
                     work_email,
                     personal_email,
                     click_response_rate,
-                    random.choice(testing_statuses)
+                    test_status
                 ))
+                
+                # Increment indices for even distribution
+                sim_type_idx += 1
+                status_idx += 1
         
         try:
             sql = """
@@ -947,6 +968,9 @@ class DatabasePopulator:
         sim_data = []
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
         
+        # Track index for even distribution
+        status_idx = 0
+        
         for employee_id in employee_ids:
             # Generate vishing simulation entries
             for _ in range(random.randint(1, 3)):
@@ -956,13 +980,19 @@ class DatabasePopulator:
                 # Use consistent statistics with small individual variations
                 vish_response_rate = random.uniform(base_vish_rate - 1.5, base_vish_rate + 1.5)
                 
+                # Use round-robin selection for even distribution
+                test_status = testing_statuses[status_idx % len(testing_statuses)]
+                
                 sim_data.append((
                     employee_id,
                     phone_number,
                     alt_phone_number,
                     vish_response_rate,
-                    random.choice(testing_statuses)
+                    test_status
                 ))
+                
+                # Increment index for even distribution
+                status_idx += 1
         
         try:
             sql = """
@@ -991,16 +1021,23 @@ class DatabasePopulator:
         device_types = ['Mobile Phone', 'Tablet', 'Laptop', 'Desktop']
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
         
+        # Track indices for even distribution
+        qr_type_idx = 0
+        device_idx = 0
+        status_idx = 0
+        malicious_idx = 0
+        
         for employee_id in employee_ids:
             # Generate quishing simulation entries
             for _ in range(random.randint(1, 2)):
-                qr_code_type = random.choice(qr_code_types)
+                # Use round-robin selection for even distribution
+                qr_code_type = qr_code_types[qr_type_idx % len(qr_code_types)]
+                device_type = device_types[device_idx % len(device_types)]
+                testing_status = testing_statuses[status_idx % len(testing_statuses)]
+                malicious_qr_clicked = (malicious_idx % 2 == 0)  # Alternate True/False
                 
                 # Use consistent statistics with small individual variations
                 qr_scan_rate = random.uniform(base_qr_scan_rate - 1.5, base_qr_scan_rate + 1.5)
-                malicious_qr_clicked = random.choice([True, False])
-                device_type = random.choice(device_types)
-                testing_status = random.choice(testing_statuses)
                 simulation_date = self.fake.date_between(start_date='-6m', end_date='today')
                 
                 sim_data.append((
@@ -1012,6 +1049,12 @@ class DatabasePopulator:
                     testing_status,
                     simulation_date
                 ))
+                
+                # Increment indices for even distribution
+                qr_type_idx += 1
+                device_idx += 1
+                status_idx += 1
+                malicious_idx += 1
         
         try:
             sql = """
@@ -1035,6 +1078,9 @@ class DatabasePopulator:
         security_levels = ['Low', 'Medium', 'High', 'Critical']
         testing_statuses = ['Completed', 'In Progress', 'Scheduled', 'Cancelled']
         branch_codes = ['MUM01', 'DEL02', 'BLR03', 'HYD04', 'CHN05', 'KOL06', 'PUN07', 'AHM08']
+        
+        # Track index for even distribution of testing status
+        status_idx = 0
         
         for employee_id in employee_ids:
             # Generate assessment entries (not every employee gets assessed)
@@ -1087,7 +1133,10 @@ class DatabasePopulator:
                 assessor_name = self.fake.indian_name()
                 assessor_id = f"ASST{random.randint(1, 20):02d}"
                 notes = f"Red team assessment completed - {security_level} security level facility"
-                testing_status = random.choice(testing_statuses)
+                
+                # Use round-robin selection for even distribution
+                testing_status = testing_statuses[status_idx % len(testing_statuses)]
+                status_idx += 1
                 
                 assessment_data.append((
                     employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
@@ -1441,6 +1490,11 @@ def main():
             return
         
         # Check if data exists
+        # Ensure schema is up-to-date (add missing columns if table existed from older schema)
+        if not populator.ensure_employee_master_columns():
+            print("✗ Failed to ensure employee_master schema is up-to-date. Please check database permissions.")
+            return
+
         data_exists = populator.check_data_exists()
         
         if data_exists:
