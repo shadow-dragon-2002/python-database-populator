@@ -1305,6 +1305,96 @@ class DatabasePopulator:
             print(f"Error fetching employee IDs: {e}")
             return []
     
+    def ensure_employee_master_columns(self):
+        """Ensure employee_master has required columns; ALTER TABLE to add any missing ones.
+
+        This fixes issues where an older table exists without recently added columns
+        (for example `phish_test_simulation_date`). It works for both MySQL and PostgreSQL.
+        """
+        expected_columns = {
+            'phish_test_simulation_date': 'DATE',
+            'phish_testing_status': "VARCHAR(20)",
+            'vishing_phone_number': "VARCHAR(20)",
+            'vishing_alt_phone_number': "VARCHAR(20)",
+            'voice_auth_test': 'BOOLEAN',
+            'vish_response_rate': 'DECIMAL(5,2)',
+            'vish_test_simulation_date': 'DATE',
+            'vish_testing_status': "VARCHAR(20)",
+            'click_response_rate': 'DECIMAL(5,2)',
+            'red_team_testing_status': "VARCHAR(20)"
+        }
+
+        try:
+            # Create a safe backup of the existing table before making schema changes
+            try:
+                import datetime
+                ts = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+                backup_table = f"employee_master_backup_{ts}"
+                print(f"⚠️  Preparing backup of existing 'employee_master' to '{backup_table}'")
+                if self.db_type == 'mysql':
+                    # MySQL: create table like + insert
+                    self.cursor.execute(f"CREATE TABLE {backup_table} LIKE employee_master")
+                    self.cursor.execute(f"INSERT INTO {backup_table} SELECT * FROM employee_master")
+                elif self.db_type == 'postgresql':
+                    # Postgres: CREATE TABLE AS
+                    self.cursor.execute(f"CREATE TABLE {backup_table} AS TABLE employee_master")
+                else:
+                    # SQLite or others: use CREATE TABLE AS SELECT
+                    self.cursor.execute(f"CREATE TABLE {backup_table} AS SELECT * FROM employee_master")
+                try:
+                    self.connection.commit()
+                except Exception:
+                    pass
+                print(f"✓ Backup created: {backup_table}")
+            except Exception as be:
+                # If backup fails, warn but continue to prompt user
+                print(f"⚠️  Warning: failed to create backup table: {be}")
+
+            # Prompt user for confirmation before altering schema
+            resp = input("Proceed to add missing columns to 'employee_master'? (yes/no): ").lower().strip()
+            if resp not in ['yes', 'y']:
+                print("✗ User cancelled schema changes. No ALTERs were performed.")
+                return False
+
+            for col, col_type in expected_columns.items():
+                if self.db_type == 'mysql':
+                    check_sql = (
+                        "SELECT COLUMN_NAME FROM information_schema.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee_master' "
+                        f"AND COLUMN_NAME = '{col}'"
+                    )
+                    self.cursor.execute(check_sql)
+                    exists = self.cursor.fetchone()
+                    if not exists:
+                        alter_sql = f"ALTER TABLE employee_master ADD COLUMN {col} {col_type}"
+                        print(f"🔧 Adding missing column to employee_master: {col} {col_type}")
+                        self.cursor.execute(alter_sql)
+                else:
+                    check_sql = (
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_name = 'employee_master' "
+                        f"AND column_name = '{col}'"
+                    )
+                    self.cursor.execute(check_sql)
+                    exists = self.cursor.fetchone()
+                    if not exists:
+                        alter_sql = f"ALTER TABLE employee_master ADD COLUMN {col} {col_type}"
+                        print(f"🔧 Adding missing column to employee_master: {col} {col_type}")
+                        self.cursor.execute(alter_sql)
+
+            try:
+                self.connection.commit()
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            print(f"✗ Error ensuring employee_master columns: {e}")
+            try:
+                self.connection.rollback()
+            except Exception:
+                pass
+            return False
+
     def close_connection(self):
         """Close database connection"""
         if self.cursor:
@@ -1396,6 +1486,11 @@ def main():
             return
         
         # Check if data exists
+        # Ensure schema is up-to-date (add missing columns if table existed from older schema)
+        if not populator.ensure_employee_master_columns():
+            print("✗ Failed to ensure employee_master schema is up-to-date. Please check database permissions.")
+            return
+
         data_exists = populator.check_data_exists()
         
         if data_exists:
