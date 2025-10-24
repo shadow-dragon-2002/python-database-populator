@@ -139,6 +139,7 @@ def demo_quishing_simulations_distribution(num_simulations=24):
         qr_type = qr_code_types[i % len(qr_code_types)]
         device = device_types[i % len(device_types)]
         status = testing_statuses[i % len(testing_statuses)]
+        # Alternate True/False for even distribution: even indices (0,2,4...) = True, odd indices (1,3,5...) = False
         malicious = (i % 2 == 0)
         
         qr_type_counts[qr_type] += 1
@@ -172,6 +173,7 @@ def demo_quishing_simulations_distribution(num_simulations=24):
         print(f"  {status:<30} {count:>3} ({percentage:>5.1f}%)")
     
     print("\nMalicious QR Clicked:")
+    # Sort with True first for better readability (showing clicked before not-clicked)
     for malicious, count in sorted(malicious_counts.items(), reverse=True):
         percentage = (count / num_simulations) * 100
         label = "True (Clicked)" if malicious else "False (Not Clicked)"
