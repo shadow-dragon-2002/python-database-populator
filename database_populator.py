@@ -1299,6 +1299,7 @@ class DatabasePopulator:
                 'qr_code_type': 'VARCHAR(100)',
                 'qr_scan_rate': 'DECIMAL(5,2)',
                 'malicious_qr_clicked': 'BOOLEAN',
+                'usb_plugged': 'BOOLEAN',
                 'device_type': 'VARCHAR(100)',
                 'testing_status': 'VARCHAR(50)',
                 'simulation_date': 'DATE'
