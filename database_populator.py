@@ -569,6 +569,7 @@ class DatabasePopulator:
                 qr_code_type VARCHAR(50),
                 qr_scan_rate DECIMAL(5,2),
                 malicious_qr_clicked BOOLEAN,
+                usb_plugged BOOLEAN,
                 device_type VARCHAR(50),
                 testing_status VARCHAR(20),
                 simulation_date DATE,
@@ -1111,8 +1112,10 @@ class DatabasePopulator:
         
         try:
             sql = """
-            INSERT INTO employee_quishing_sim (employee_id, qr_code_type, qr_scan_rate, malicious_qr_clicked, device_type, testing_status, simulation_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO employee_quishing_sim (
+                employee_id, qr_code_type, qr_scan_rate, malicious_qr_clicked, usb_plugged, device_type, testing_status, simulation_date
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
             
             self.cursor.executemany(sql, sim_data)
