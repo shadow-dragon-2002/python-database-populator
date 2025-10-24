@@ -903,45 +903,67 @@ class DatabasePopulator:
     
     def generate_phish_smish_simulations(self, employee_ids):
         """Generate phishing/smishing simulation data"""
-        # Get consistent statistics
+        # Create phish/smish sim entries with even but randomized distribution
         consistent_stats = self.generate_consistent_statistics(len(employee_ids))
         base_click_rate = consistent_stats['phishing_click_rate']
-        
+
         sim_data = []
-        # Simulation types aligned with test type (phishing/smishing)
         simulation_types = ['Email Phishing', 'SMS Phishing', 'Social Media Phishing']
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
-        
-        # Track indices for even distribution
-        sim_type_idx = 0
-        status_idx = 0
-        
+
+        # Build raw entries first (so total count is known) then assign even randomized categories
+        raw_entries = []
         for employee_id in employee_ids:
-            # Generate multiple simulation entries per employee
             for _ in range(random.randint(2, 4)):
-                # Get employee work and personal email from employee_master
                 work_email = f"emp{employee_id}@fisst.edu"
                 personal_email = f"emp{employee_id}@gmail.com"
-                
-                # Use consistent statistics with small individual variations
-                click_response_rate = random.uniform(base_click_rate - 1.5, base_click_rate + 1.5)
-                
-                # Use round-robin selection for even distribution
-                sim_type = simulation_types[sim_type_idx % len(simulation_types)]
-                test_status = testing_statuses[status_idx % len(testing_statuses)]
-                
-                sim_data.append((
-                    employee_id,
-                    sim_type,
-                    work_email,
-                    personal_email,
-                    click_response_rate,
-                    test_status
-                ))
-                
-                # Increment indices for even distribution
-                sim_type_idx += 1
-                status_idx += 1
+                # click rate will be decided per-entry later (baseline vs intervention)
+                raw_entries.append((employee_id, work_email, personal_email))
+
+        total = len(raw_entries)
+        if total == 0:
+            print("✗ No employees to generate phish/smish simulations for")
+            return False
+
+        # Helper: create an even randomized assignment list
+        def even_random_assignment(choices, n):
+            reps = n // len(choices)
+            rem = n % len(choices)
+            arr = []
+            for c in choices:
+                arr.extend([c] * reps)
+            # distribute remainder
+            for i in range(rem):
+                arr.append(choices[i % len(choices)])
+            random.shuffle(arr)
+            return arr
+
+        assigned_types = even_random_assignment(simulation_types, total)
+        assigned_statuses = even_random_assignment(testing_statuses, total)
+
+        # To model baseline vs intervention outcomes, we'll mark half entries as baseline
+        half = total // 2
+        # baseline: high click (~22%), reporting ~0%; intervention: low click (~5%), reporting ~38%
+        reporting_rate_baseline = 0.0
+        reporting_rate_intervention = 0.38
+
+        for idx, (employee_id, work_email, personal_email) in enumerate(raw_entries):
+            # choose base click depending on baseline/intervention
+            if idx < half:
+                click_response_rate = random.uniform(base_click_rate - 1.0, base_click_rate + 1.0)  # ~22%
+                reported = random.random() < reporting_rate_baseline
+            else:
+                click_response_rate = random.uniform(4.0, 6.0)  # intervention ~5%
+                reported = random.random() < reporting_rate_intervention
+
+            sim_data.append((
+                employee_id,
+                assigned_types[idx],
+                work_email,
+                personal_email,
+                round(click_response_rate, 2),
+                assigned_statuses[idx]
+            ))
         
         try:
             sql = """
@@ -1012,49 +1034,80 @@ class DatabasePopulator:
     
     def generate_quishing_simulations(self, employee_ids):
         """Generate quishing (QR code phishing) simulation data"""
-        # Get consistent statistics
+        # Evenized quishing simulations with USB plug-in modeling
         consistent_stats = self.generate_consistent_statistics(len(employee_ids))
         base_qr_scan_rate = consistent_stats['quishing_scan_rate']
-        
+
         sim_data = []
         qr_code_types = ['Payment QR', 'WiFi QR', 'App Download QR', 'Survey QR', 'Menu QR', 'Contact QR']
         device_types = ['Mobile Phone', 'Tablet', 'Laptop', 'Desktop']
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
-        
-        # Track indices for even distribution
-        qr_type_idx = 0
-        device_idx = 0
-        status_idx = 0
-        malicious_idx = 0
-        
+
+        raw_entries = []
         for employee_id in employee_ids:
-            # Generate quishing simulation entries
             for _ in range(random.randint(1, 2)):
-                # Use round-robin selection for even distribution
-                qr_code_type = qr_code_types[qr_type_idx % len(qr_code_types)]
-                device_type = device_types[device_idx % len(device_types)]
-                testing_status = testing_statuses[status_idx % len(testing_statuses)]
-                malicious_qr_clicked = (malicious_idx % 2 == 0)  # Alternate True/False
-                
-                # Use consistent statistics with small individual variations
-                qr_scan_rate = random.uniform(base_qr_scan_rate - 1.5, base_qr_scan_rate + 1.5)
-                simulation_date = self.fake.date_between(start_date='-6m', end_date='today')
-                
-                sim_data.append((
-                    employee_id,
-                    qr_code_type,
-                    qr_scan_rate,
-                    malicious_qr_clicked,
-                    device_type,
-                    testing_status,
-                    simulation_date
-                ))
-                
-                # Increment indices for even distribution
-                qr_type_idx += 1
-                device_idx += 1
-                status_idx += 1
-                malicious_idx += 1
+                raw_entries.append(employee_id)
+
+        total = len(raw_entries)
+        if total == 0:
+            print("✗ No employees to generate quishing simulations for")
+            return False
+
+        def even_random_assignment(choices, n):
+            reps = n // len(choices)
+            rem = n % len(choices)
+            arr = []
+            for c in choices:
+                arr.extend([c] * reps)
+            for i in range(rem):
+                arr.append(choices[i % len(choices)])
+            random.shuffle(arr)
+            return arr
+
+        assigned_qr = even_random_assignment(qr_code_types, total)
+        assigned_device = even_random_assignment(device_types, total)
+        assigned_status = even_random_assignment(testing_statuses, total)
+
+        # Baseline vs intervention split (half-half)
+        half = total // 2
+        # baseline: usb plugs present (we'll set 11 across baseline), reporting low
+        usb_baseline_total = 11
+        usb_assigned = set()
+
+        for idx, employee_id in enumerate(raw_entries):
+            qr_code_type = assigned_qr[idx]
+            device_type = assigned_device[idx]
+            testing_status = assigned_status[idx]
+            if idx < half:
+                qr_scan_rate = random.uniform(base_qr_scan_rate - 1.0, base_qr_scan_rate + 1.0)
+                malicious_qr_clicked = random.choice([True, False])
+                usb_plugged = False  # baseline: we'll mark a few separately
+            else:
+                qr_scan_rate = random.uniform(4.0, 6.0)
+                malicious_qr_clicked = False
+                usb_plugged = False
+
+            simulation_date = self.fake.date_between(start_date='-6m', end_date='today')
+
+            sim_data.append((
+                employee_id,
+                qr_code_type,
+                round(qr_scan_rate, 2),
+                malicious_qr_clicked,
+                usb_plugged,
+                device_type,
+                testing_status,
+                simulation_date
+            ))
+
+        # Assign exactly usb_baseline_total usb_plugged True entries within baseline portion
+        baseline_indices = [i for i in range(0, half)]
+        random.shuffle(baseline_indices)
+        for i in baseline_indices[:min(usb_baseline_total, len(baseline_indices))]:
+            entry = list(sim_data[i])
+            # usb_plugged is at index 4 in the tuple we constructed
+            entry[4] = True
+            sim_data[i] = tuple(entry)
         
         try:
             sql = """
@@ -1291,7 +1344,37 @@ class DatabasePopulator:
                         print(f"  {row['branch_code']} ({row['branch_location']}): {row['employee_count']} employees")
                     else:
                         print(f"  {row[0]} ({row[1]}): {row[2]} employees")
-            
+                # Compute ROI and case-study metrics
+                try:
+                    # Phishing summary: approximate baseline vs intervention click rates
+                    self.cursor.execute("SELECT click_response_rate FROM employee_phish_smish_sim")
+                    click_rows = self.cursor.fetchall()
+                    clicks = [r['click_response_rate'] if isinstance(r, dict) else r[0] for r in click_rows if r]
+                    avg_click = sum(clicks) / len(clicks) if clicks else 0
+
+                    # USB plugs
+                    try:
+                        self.cursor.execute("SELECT COUNT(*) FROM employee_quishing_sim WHERE usb_plugged = TRUE")
+                        usb_count_row = self.cursor.fetchone()
+                        usb_count = usb_count_row['COUNT(*)'] if isinstance(usb_count_row, dict) else usb_count_row[0]
+                    except Exception:
+                        usb_count = 0
+
+                    # Reporting rate approximation (we don't store reporting; estimate from click->reported assumptions)
+                    # For demonstration, assume intervention reporting ~38% and baseline ~0% as generated
+
+                    avoided_fraud = 73000000  # ₹7.3 crore avoided phishing payroll fraud
+                    engagement_cost = max(1, int(avoided_fraud / 16))  # ensure >15x ROI (we use 16x)
+                    roi = avoided_fraud / engagement_cost if engagement_cost else 0
+
+                    print(f"\nCase-study highlights:")
+                    print(f"  • Average Click Response Rate (all sims): {avg_click:.2f}%")
+                    print(f"  • USB plug-ins detected (simulated baseline): {usb_count}")
+                    print(f"  • Estimated avoided fraud: ₹{avoided_fraud:,}")
+                    print(f"  • Engagement cost: ₹{engagement_cost:,}")
+                    print(f"  • ROI (avoided / engagement): {roi:.1f}x")
+                except Exception:
+                    pass
         except Exception as e:
             print(f"Error generating statistics: {e}")
     
@@ -1348,6 +1431,7 @@ class DatabasePopulator:
                 'qr_code_type': 'VARCHAR(100)',
                 'qr_scan_rate': 'DECIMAL(5,2)',
                 'malicious_qr_clicked': 'BOOLEAN',
+                'usb_plugged': 'BOOLEAN',
                 'device_type': 'VARCHAR(100)',
                 'testing_status': 'VARCHAR(50)',
                 'simulation_date': 'DATE'
