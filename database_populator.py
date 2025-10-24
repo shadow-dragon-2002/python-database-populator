@@ -599,6 +599,7 @@ class DatabasePopulator:
                 assess_id INT AUTO_INCREMENT PRIMARY KEY,
                 employee_id INT NOT NULL,
                 branch_code VARCHAR(10),
+                intrusion_detected_reception BOOLEAN,
                 local_employees_at_branch INT,
                 security_level VARCHAR(20),
                 building_storeys INT,
@@ -635,6 +636,7 @@ class DatabasePopulator:
                 assess_id SERIAL PRIMARY KEY,
                 employee_id INT NOT NULL,
                 branch_code VARCHAR(10),
+                intrusion_detected_reception BOOLEAN,
                 local_employees_at_branch INT,
                 security_level VARCHAR(20),
                 building_storeys INT,
@@ -782,16 +784,38 @@ class DatabasePopulator:
             family_details = f"Family of {random.randint(2, 6)} members"
             medical_conditions = random.choice(['None', 'Diabetes', 'Hypertension', 'Asthma', 'None', 'None'])  # Most have None
             
-            # Use consistent statistics with small individual variations
-            # Simulation type aligned with test types - evenly distributed
-            simulation_types = ['Phishing Test', 'Vishing Test', 'Quishing Test', 'Red Team Assessment']
-            simulation_type = simulation_types[i % len(simulation_types)]
+            # We'll assign simulation types and testing statuses in an even but randomized way
+            # to avoid visible cyclic patterns while keeping overall balance.
+            def even_random_assignment(choices, n):
+                reps = n // len(choices)
+                rem = n % len(choices)
+                arr = []
+                for c in choices:
+                    arr.extend([c] * reps)
+                for i2 in range(rem):
+                    arr.append(choices[i2 % len(choices)])
+                random.shuffle(arr)
+                return arr
+
+            # Prepare balanced assignments once per run
+            if i == 0:
+                sim_choices = ['Phishing Test', 'Vishing Test', 'Quishing Test', 'Red Team Assessment']
+                phish_status_choices = ['Completed', 'Pending', 'Failed', 'Passed']
+                vish_status_choices = ['Completed', 'Pending', 'Failed', 'Passed']
+                red_status_choices = ['Completed', 'In Progress', 'Scheduled', 'Cancelled']
+                # Balanced assignments across all employees
+                assigned_simulation_types = even_random_assignment(sim_choices, num_employees)
+                assigned_phish_statuses = even_random_assignment(phish_status_choices, num_employees)
+                assigned_vish_statuses = even_random_assignment(vish_status_choices, num_employees)
+                assigned_red_statuses = even_random_assignment(red_status_choices, num_employees)
+
+            # Take the precomputed assigned values for this employee
+            simulation_type = assigned_simulation_types[i]
             base_click_rate = consistent_stats['phishing_click_rate']
-            click_response_rate = random.uniform(base_click_rate - 1, base_click_rate + 1)  # Small individual variation
+            # We'll add a small individual variation to look realistic
+            click_response_rate = random.uniform(base_click_rate - 1, base_click_rate + 1)
             phish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
-            # Even distribution of testing statuses
-            phish_testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
-            phish_testing_status = phish_testing_statuses[i % len(phish_testing_statuses)]
+            phish_testing_status = assigned_phish_statuses[i]
             
             # Vishing data with consistent stats
             vishing_phone_number = phone_number
@@ -800,9 +824,8 @@ class DatabasePopulator:
             base_vish_rate = consistent_stats['vishing_response_rate']
             vish_response_rate = random.uniform(base_vish_rate - 1, base_vish_rate + 1)  # Small individual variation
             vish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
-            # Even distribution of testing statuses
-            vish_testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
-            vish_testing_status = vish_testing_statuses[i % len(vish_testing_statuses)]
+            # Use preassigned vishing testing status
+            vish_testing_status = assigned_vish_statuses[i]
             
             # Branch and assessment data
             branch_idx = i % len(branch_codes)
@@ -851,9 +874,8 @@ class DatabasePopulator:
             assessor_name = self.fake.indian_name()
             assessor_id = f"ASST{random.randint(1, 20):02d}"
             notes = f"Assessment completed for {department} department employee"
-            # Even distribution of testing statuses
-            red_team_testing_statuses = ['Completed', 'In Progress', 'Scheduled', 'Cancelled']
-            red_team_testing_status = red_team_testing_statuses[i % len(red_team_testing_statuses)]
+            # Use preassigned red team testing status
+            red_team_testing_status = assigned_red_statuses[i]
             
             employees_data.append((
                 employee_id, first_name, last_name, gender, date_of_birth, age, blood_group, marital_status,
@@ -990,32 +1012,42 @@ class DatabasePopulator:
         
         sim_data = []
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
-        
-        # Track index for even distribution
-        status_idx = 0
-        
+        # Build raw entries then assign testing_status evenly to avoid obvious repeating patterns
+        raw_entries = []
         for employee_id in employee_ids:
-            # Generate vishing simulation entries
             for _ in range(random.randint(1, 3)):
                 phone_number = self.fake.indian_phone()
                 alt_phone_number = self.fake.indian_phone()
-                
-                # Use consistent statistics with small individual variations
-                vish_response_rate = random.uniform(base_vish_rate - 1.5, base_vish_rate + 1.5)
-                
-                # Use round-robin selection for even distribution
-                test_status = testing_statuses[status_idx % len(testing_statuses)]
-                
-                sim_data.append((
-                    employee_id,
-                    phone_number,
-                    alt_phone_number,
-                    vish_response_rate,
-                    test_status
-                ))
-                
-                # Increment index for even distribution
-                status_idx += 1
+                raw_entries.append((employee_id, phone_number, alt_phone_number))
+
+        total = len(raw_entries)
+        if total == 0:
+            print("✗ No employees to generate vishing simulations for")
+            return False
+
+        def even_random_assignment(choices, n):
+            reps = n // len(choices)
+            rem = n % len(choices)
+            arr = []
+            for c in choices:
+                arr.extend([c] * reps)
+            for i in range(rem):
+                arr.append(choices[i % len(choices)])
+            random.shuffle(arr)
+            return arr
+
+        assigned_statuses = even_random_assignment(testing_statuses, total)
+
+        for idx, (employee_id, phone_number, alt_phone_number) in enumerate(raw_entries):
+            vish_response_rate = random.uniform(base_vish_rate - 1.5, base_vish_rate + 1.5)
+            test_status = assigned_statuses[idx]
+            sim_data.append((
+                employee_id,
+                phone_number,
+                alt_phone_number,
+                round(vish_response_rate, 2),
+                test_status
+            ))
         
         try:
             sql = """
@@ -1135,9 +1167,6 @@ class DatabasePopulator:
         testing_statuses = ['Completed', 'In Progress', 'Scheduled', 'Cancelled']
         branch_codes = ['MUM01', 'DEL02', 'BLR03', 'HYD04', 'CHN05', 'KOL06', 'PUN07', 'AHM08']
         
-        # Track index for even distribution of testing status
-        status_idx = 0
-        
         for employee_id in employee_ids:
             # Generate assessment entries (not every employee gets assessed)
             if random.random() < 0.7:  # 70% of employees get assessed
@@ -1189,37 +1218,61 @@ class DatabasePopulator:
                 assessor_name = self.fake.indian_name()
                 assessor_id = f"ASST{random.randint(1, 20):02d}"
                 notes = f"Red team assessment completed - {security_level} security level facility"
-                
-                # Use round-robin selection for even distribution
-                testing_status = testing_statuses[status_idx % len(testing_statuses)]
-                status_idx += 1
-                
+                # Assign intrusion detection at reception with a higher chance to simulate detection
+                intrusion_detected_reception = random.random() < 0.7
+
+                # Build tuple without testing_status (we'll assign testing_status evenly after collecting all entries)
                 assessment_data.append((
-                    employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
+                    employee_id, branch_code, intrusion_detected_reception, local_employees_at_branch, security_level, building_storeys,
                     assessment_date, assessment_time_start, assessment_time_end, permission_granted,
                     approving_official_name, approving_official_designation, identity_verification_required,
                     identity_verified, security_guard_present, visitor_log_maintained, badge_issued,
                     escort_required, restricted_areas_accessed, tailgating_possible, social_engineering_successful,
                     physical_security_score, human_security_score, overall_assessment_score,
-                    vulnerabilities_found, recommendations, assessor_name, assessor_id, notes, testing_status
+                    vulnerabilities_found, recommendations, assessor_name, assessor_id, notes
                 ))
         
         try:
-            sql = """
+            # Assign testing_status evenly across collected assessment entries to avoid patterns
+            def even_random_assignment(choices, n):
+                reps = n // len(choices)
+                rem = n % len(choices)
+                arr = []
+                for c in choices:
+                    arr.extend([c] * reps)
+                for i2 in range(rem):
+                    arr.append(choices[i2 % len(choices)])
+                random.shuffle(arr)
+                return arr
+
+            if assessment_data:
+                assigned_statuses = even_random_assignment(testing_statuses, len(assessment_data))
+                final_assessment_data = [tuple(list(row) + [assigned_statuses[idx]]) for idx, row in enumerate(assessment_data)]
+            else:
+                final_assessment_data = []
+
+            if not final_assessment_data:
+                # Nothing to insert
+                print("✓ Generated 0 red team assessment entries!")
+                return True
+
+            num_cols = len(final_assessment_data[0])
+            placeholders = ', '.join(['%s'] * num_cols)
+            sql = f"""
             INSERT INTO red_team_assessment (
-                employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
+                employee_id, branch_code, intrusion_detected_reception, local_employees_at_branch, security_level, building_storeys,
                 assessment_date, assessment_time_start, assessment_time_end, permission_granted,
                 approving_official_name, approving_official_designation, identity_verification_required,
                 identity_verified, security_guard_present, visitor_log_maintained, badge_issued,
                 escort_required, restricted_areas_accessed, tailgating_possible, social_engineering_successful,
                 physical_security_score, human_security_score, overall_assessment_score,
                 vulnerabilities_found, recommendations, assessor_name, assessor_id, notes, testing_status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES ({placeholders})
             """
-            
-            self.cursor.executemany(sql, assessment_data)
+
+            self.cursor.executemany(sql, final_assessment_data)
             self.connection.commit()
-            print(f"✓ Generated {len(assessment_data)} red team assessment entries!")
+            print(f"✓ Generated {len(final_assessment_data)} red team assessment entries!")
             return True
             
         except Exception as e:
@@ -1441,6 +1494,7 @@ class DatabasePopulator:
             },
             'red_team_assessment': {
                 'branch_code': 'VARCHAR(10)',
+                'intrusion_detected_reception': 'BOOLEAN',
                 'local_employees_at_branch': 'INT',
                 'security_level': 'VARCHAR(20)',
                 'building_storeys': 'INT',
