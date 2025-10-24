@@ -1304,10 +1304,34 @@ class DatabasePopulator:
                 'simulation_date': 'DATE'
             },
             'red_team_assessment': {
-                'testing_status': 'VARCHAR(50)',
+                'branch_code': 'VARCHAR(10)',
+                'local_employees_at_branch': 'INT',
+                'security_level': 'VARCHAR(20)',
+                'building_storeys': 'INT',
+                'assessment_date': 'DATE',
+                'assessment_time_start': 'TIME',
+                'assessment_time_end': 'TIME',
+                'permission_granted': 'BOOLEAN',
+                'approving_official_name': 'VARCHAR(100)',
+                'approving_official_designation': 'VARCHAR(50)',
+                'identity_verification_required': 'BOOLEAN',
+                'identity_verified': 'BOOLEAN',
+                'security_guard_present': 'BOOLEAN',
+                'visitor_log_maintained': 'BOOLEAN',
+                'badge_issued': 'BOOLEAN',
+                'escort_required': 'BOOLEAN',
+                'restricted_areas_accessed': 'BOOLEAN',
+                'tailgating_possible': 'BOOLEAN',
+                'social_engineering_successful': 'BOOLEAN',
+                'physical_security_score': 'DECIMAL(5,1)',
+                'human_security_score': 'DECIMAL(5,1)',
+                'overall_assessment_score': 'DECIMAL(5,1)',
                 'vulnerabilities_found': 'TEXT',
                 'recommendations': 'TEXT',
-                'notes': 'TEXT'
+                'assessor_name': 'VARCHAR(100)',
+                'assessor_id': 'VARCHAR(20)',
+                'notes': 'TEXT',
+                'testing_status': 'VARCHAR(50)'
             }
         }
 
