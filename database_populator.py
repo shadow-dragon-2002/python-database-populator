@@ -1297,8 +1297,11 @@ class DatabasePopulator:
             },
             'employee_quishing_sim': {
                 'qr_code_type': 'VARCHAR(100)',
+                'qr_scan_rate': 'DECIMAL(5,2)',
+                'malicious_qr_clicked': 'BOOLEAN',
                 'device_type': 'VARCHAR(100)',
-                'testing_status': 'VARCHAR(50)'
+                'testing_status': 'VARCHAR(50)',
+                'simulation_date': 'DATE'
             },
             'red_team_assessment': {
                 'testing_status': 'VARCHAR(50)',
