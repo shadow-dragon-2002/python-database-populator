@@ -1306,94 +1306,226 @@ class DatabasePopulator:
             return []
     
     def ensure_employee_master_columns(self):
-        """Ensure employee_master has required columns; ALTER TABLE to add any missing ones.
+        """Ensure employee_master and related simulation tables have suitable column types/lengths.
 
-        This fixes issues where an older table exists without recently added columns
-        (for example `phish_test_simulation_date`). It works for both MySQL and PostgreSQL.
+        This routine is non-interactive and attempts to be permissive:
+        - Creates a timestamped backup of each table before attempting any ALTERs
+        - Adds missing columns
+        - Enlarges VARCHAR columns when their current length is smaller than desired
+        - For long textual fields switches to TEXT when appropriate
+
+        Designed to avoid "Data too long" MySQL errors by ensuring generous column sizes.
         """
-        expected_columns = {
-            'phish_test_simulation_date': 'DATE',
-            'phish_testing_status': "VARCHAR(20)",
-            'vishing_phone_number': "VARCHAR(20)",
-            'vishing_alt_phone_number': "VARCHAR(20)",
-            'voice_auth_test': 'BOOLEAN',
-            'vish_response_rate': 'DECIMAL(5,2)',
-            'vish_test_simulation_date': 'DATE',
-            'vish_testing_status': "VARCHAR(20)",
-            'click_response_rate': 'DECIMAL(5,2)',
-            'red_team_testing_status': "VARCHAR(20)"
+
+        # Per-table expected columns and their desired types (use generous sizes to avoid truncation)
+        tables_expectations = {
+            'employee_master': {
+                'phish_test_simulation_date': 'DATE',
+                'phish_testing_status': 'VARCHAR(50)',
+                'vishing_phone_number': 'VARCHAR(30)',
+                'vishing_alt_phone_number': 'VARCHAR(30)',
+                'voice_auth_test': 'BOOLEAN',
+                'vish_response_rate': 'DECIMAL(5,2)',
+                'vish_test_simulation_date': 'DATE',
+                'vish_testing_status': 'VARCHAR(50)',
+                'click_response_rate': 'DECIMAL(5,2)',
+                'red_team_testing_status': 'VARCHAR(50)',
+                'simulation_type': 'VARCHAR(100)',
+                'notes': 'TEXT'
+            },
+            'employee_phish_smish_sim': {
+                'simulation_type': 'VARCHAR(100)',
+                'work_email': 'VARCHAR(150)',
+                'personal_email': 'VARCHAR(150)',
+                'testing_status': 'VARCHAR(50)'
+            },
+            'employee_vishing_sim': {
+                'phone_number': 'VARCHAR(30)',
+                'alt_phone_number': 'VARCHAR(30)',
+                'testing_status': 'VARCHAR(50)'
+            },
+            'employee_quishing_sim': {
+                'qr_code_type': 'VARCHAR(100)',
+                'device_type': 'VARCHAR(100)',
+                'testing_status': 'VARCHAR(50)'
+            },
+            'red_team_assessment': {
+                'testing_status': 'VARCHAR(50)',
+                'vulnerabilities_found': 'TEXT',
+                'recommendations': 'TEXT',
+                'notes': 'TEXT'
+            }
         }
 
-        try:
-            # Create a safe backup of the existing table before making schema changes
+        import datetime
+
+        def _create_backup(table):
+            ts = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            backup_table = f"{table}_backup_{ts}"
             try:
-                import datetime
-                ts = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-                backup_table = f"employee_master_backup_{ts}"
-                print(f"⚠️  Preparing backup of existing 'employee_master' to '{backup_table}'")
+                print(f"⚠️  Creating backup of '{table}' -> '{backup_table}'")
                 if self.db_type == 'mysql':
-                    # MySQL: create table like + insert
-                    self.cursor.execute(f"CREATE TABLE {backup_table} LIKE employee_master")
-                    self.cursor.execute(f"INSERT INTO {backup_table} SELECT * FROM employee_master")
+                    self.cursor.execute(f"CREATE TABLE {backup_table} LIKE {table}")
+                    self.cursor.execute(f"INSERT INTO {backup_table} SELECT * FROM {table}")
                 elif self.db_type == 'postgresql':
-                    # Postgres: CREATE TABLE AS
-                    self.cursor.execute(f"CREATE TABLE {backup_table} AS TABLE employee_master")
+                    self.cursor.execute(f"CREATE TABLE {backup_table} AS TABLE {table}")
                 else:
-                    # SQLite or others: use CREATE TABLE AS SELECT
-                    self.cursor.execute(f"CREATE TABLE {backup_table} AS SELECT * FROM employee_master")
+                    # SQLite and others
+                    self.cursor.execute(f"CREATE TABLE {backup_table} AS SELECT * FROM {table}")
                 try:
                     self.connection.commit()
                 except Exception:
                     pass
                 print(f"✓ Backup created: {backup_table}")
+                return True
             except Exception as be:
-                # If backup fails, warn but continue to prompt user
-                print(f"⚠️  Warning: failed to create backup table: {be}")
-
-            # Prompt user for confirmation before altering schema
-            resp = input("Proceed to add missing columns to 'employee_master'? (yes/no): ").lower().strip()
-            if resp not in ['yes', 'y']:
-                print("✗ User cancelled schema changes. No ALTERs were performed.")
+                print(f"⚠️ Warning: failed to create backup for {table}: {be}")
+                try:
+                    self.connection.rollback()
+                except Exception:
+                    pass
                 return False
 
-            for col, col_type in expected_columns.items():
+        def _get_column_info(table, column):
+            try:
                 if self.db_type == 'mysql':
-                    check_sql = (
-                        "SELECT COLUMN_NAME FROM information_schema.COLUMNS "
-                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee_master' "
-                        f"AND COLUMN_NAME = '{col}'"
+                    sql = (
+                        "SELECT DATA_TYPE, COLUMN_TYPE, CHARACTER_MAXIMUM_LENGTH "
+                        "FROM information_schema.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s"
                     )
-                    self.cursor.execute(check_sql)
-                    exists = self.cursor.fetchone()
-                    if not exists:
-                        alter_sql = f"ALTER TABLE employee_master ADD COLUMN {col} {col_type}"
-                        print(f"🔧 Adding missing column to employee_master: {col} {col_type}")
-                        self.cursor.execute(alter_sql)
+                    self.cursor.execute(sql, (table, column))
+                    return self.cursor.fetchone()
                 else:
-                    check_sql = (
-                        "SELECT column_name FROM information_schema.columns "
-                        "WHERE table_name = 'employee_master' "
-                        f"AND column_name = '{col}'"
+                    sql = (
+                        "SELECT data_type, udt_name, character_maximum_length "
+                        "FROM information_schema.columns "
+                        "WHERE table_name = %s AND column_name = %s"
                     )
-                    self.cursor.execute(check_sql)
-                    exists = self.cursor.fetchone()
-                    if not exists:
-                        alter_sql = f"ALTER TABLE employee_master ADD COLUMN {col} {col_type}"
-                        print(f"🔧 Adding missing column to employee_master: {col} {col_type}")
-                        self.cursor.execute(alter_sql)
+                    self.cursor.execute(sql, (table, column))
+                    return self.cursor.fetchone()
+            except Exception:
+                return None
 
+        def _parse_varchar_length(col_type_str):
+            # Expect strings like VARCHAR(100)
+            if not col_type_str:
+                return None
+            col_type_str = col_type_str.upper()
+            if 'VARCHAR' in col_type_str and '(' in col_type_str:
+                try:
+                    start = col_type_str.index('(') + 1
+                    end = col_type_str.index(')')
+                    return int(col_type_str[start:end])
+                except Exception:
+                    return None
+            return None
+
+        for table, cols in tables_expectations.items():
+            # Skip tables that don't exist
+            try:
+                if not self.check_table_exists(table):
+                    continue
+            except Exception:
+                continue
+
+            # Create backup (best-effort)
+            _create_backup(table)
+
+            for col_name, desired_type in cols.items():
+                try:
+                    col_info = _get_column_info(table, col_name)
+                    if not col_info:
+                        # Column missing -> add it
+                        alter_sql = f"ALTER TABLE {table} ADD COLUMN {col_name} {desired_type}"
+                        print(f"🔧 Adding missing column: {table}.{col_name} {desired_type}")
+                        try:
+                            self.cursor.execute(alter_sql)
+                        except Exception as ae:
+                            print(f"⚠️ Failed to add column {table}.{col_name}: {ae}")
+                            try:
+                                self.connection.rollback()
+                            except Exception:
+                                pass
+                        continue
+
+                    # If column exists, for VARCHAR check length and enlarge if necessary
+                    # col_info for mysql: dict with keys DATA_TYPE, COLUMN_TYPE, CHARACTER_MAXIMUM_LENGTH
+                    # for psycopg2 RealDictCursor it will be a tuple-like row
+                    try:
+                        if isinstance(col_info, dict):
+                            current_data_type = col_info.get('DATA_TYPE') or col_info.get('data_type')
+                            current_max_len = col_info.get('CHARACTER_MAXIMUM_LENGTH') or col_info.get('character_maximum_length')
+                            current_type_detail = col_info.get('COLUMN_TYPE') or col_info.get('udt_name')
+                        else:
+                            # tuple-like: (data_type, udt_name, character_maximum_length)
+                            current_data_type = col_info[0]
+                            current_type_detail = col_info[1]
+                            current_max_len = col_info[2]
+                    except Exception:
+                        current_data_type = None
+                        current_max_len = None
+                        current_type_detail = None
+
+                    desired_v_len = _parse_varchar_length(desired_type)
+
+                    if desired_v_len and (current_data_type and 'char' in str(current_data_type).lower()):
+                        try:
+                            cur_len = int(current_max_len) if current_max_len else None
+                        except Exception:
+                            cur_len = None
+
+                        if cur_len is None or cur_len < desired_v_len:
+                            # Enlarge column
+                            if self.db_type == 'mysql':
+                                modify_sql = f"ALTER TABLE {table} MODIFY COLUMN {col_name} {desired_type}"
+                            else:
+                                # PostgreSQL: ALTER COLUMN TYPE
+                                modify_sql = f"ALTER TABLE {table} ALTER COLUMN {col_name} TYPE {desired_type}"
+                            print(f"🔧 Enlarging column {table}.{col_name} from {cur_len} to {desired_v_len}")
+                            try:
+                                self.cursor.execute(modify_sql)
+                            except Exception as me:
+                                print(f"⚠️ Failed to modify column {table}.{col_name}: {me}")
+                                try:
+                                    self.connection.rollback()
+                                except Exception:
+                                    pass
+                            continue
+
+                    # If desired type is TEXT and current is VARCHAR, prefer TEXT to avoid truncation
+                    if 'TEXT' in desired_type.upper() and current_data_type and 'char' in str(current_data_type).lower():
+                        try:
+                            if self.db_type == 'mysql':
+                                modify_sql = f"ALTER TABLE {table} MODIFY COLUMN {col_name} TEXT"
+                            else:
+                                modify_sql = f"ALTER TABLE {table} ALTER COLUMN {col_name} TYPE TEXT"
+                            print(f"🔧 Converting {table}.{col_name} to TEXT to avoid truncation")
+                            try:
+                                self.cursor.execute(modify_sql)
+                            except Exception as te:
+                                print(f"⚠️ Failed to convert {table}.{col_name} to TEXT: {te}")
+                                try:
+                                    self.connection.rollback()
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                except Exception as e:
+                    print(f"⚠️ Unexpected error while ensuring {table}.{col_name}: {e}")
+                    try:
+                        self.connection.rollback()
+                    except Exception:
+                        pass
+
+            # Commit after each table
             try:
                 self.connection.commit()
             except Exception:
                 pass
-            return True
-        except Exception as e:
-            print(f"✗ Error ensuring employee_master columns: {e}")
-            try:
-                self.connection.rollback()
-            except Exception:
-                pass
-            return False
+
+        return True
 
     def close_connection(self):
         """Close database connection"""
