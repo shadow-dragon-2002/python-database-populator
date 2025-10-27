@@ -599,7 +599,6 @@ class DatabasePopulator:
                 assess_id INT AUTO_INCREMENT PRIMARY KEY,
                 employee_id INT NOT NULL,
                 branch_code VARCHAR(10),
-                intrusion_detected_reception BOOLEAN,
                 local_employees_at_branch INT,
                 security_level VARCHAR(20),
                 building_storeys INT,
@@ -636,7 +635,6 @@ class DatabasePopulator:
                 assess_id SERIAL PRIMARY KEY,
                 employee_id INT NOT NULL,
                 branch_code VARCHAR(10),
-                intrusion_detected_reception BOOLEAN,
                 local_employees_at_branch INT,
                 security_level VARCHAR(20),
                 building_storeys INT,
@@ -1218,12 +1216,10 @@ class DatabasePopulator:
                 assessor_name = self.fake.indian_name()
                 assessor_id = f"ASST{random.randint(1, 20):02d}"
                 notes = f"Red team assessment completed - {security_level} security level facility"
-                # Assign intrusion detection at reception with a higher chance to simulate detection
-                intrusion_detected_reception = random.random() < 0.7
 
                 # Build tuple without testing_status (we'll assign testing_status evenly after collecting all entries)
                 assessment_data.append((
-                    employee_id, branch_code, intrusion_detected_reception, local_employees_at_branch, security_level, building_storeys,
+                    employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
                     assessment_date, assessment_time_start, assessment_time_end, permission_granted,
                     approving_official_name, approving_official_designation, identity_verification_required,
                     identity_verified, security_guard_present, visitor_log_maintained, badge_issued,
@@ -1260,7 +1256,7 @@ class DatabasePopulator:
             placeholders = ', '.join(['%s'] * num_cols)
             sql = f"""
             INSERT INTO red_team_assessment (
-                employee_id, branch_code, intrusion_detected_reception, local_employees_at_branch, security_level, building_storeys,
+                employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
                 assessment_date, assessment_time_start, assessment_time_end, permission_granted,
                 approving_official_name, approving_official_designation, identity_verification_required,
                 identity_verified, security_guard_present, visitor_log_maintained, badge_issued,
@@ -1494,7 +1490,6 @@ class DatabasePopulator:
             },
             'red_team_assessment': {
                 'branch_code': 'VARCHAR(10)',
-                'intrusion_detected_reception': 'BOOLEAN',
                 'local_employees_at_branch': 'INT',
                 'security_level': 'VARCHAR(20)',
                 'building_storeys': 'INT',
@@ -1618,15 +1613,12 @@ class DatabasePopulator:
                         continue
 
                     # If column exists, for VARCHAR check length and enlarge if necessary
-                    # col_info for mysql: dict with keys DATA_TYPE, COLUMN_TYPE, CHARACTER_MAXIMUM_LENGTH
-                    # for psycopg2 RealDictCursor it will be a tuple-like row
                     try:
                         if isinstance(col_info, dict):
                             current_data_type = col_info.get('DATA_TYPE') or col_info.get('data_type')
                             current_max_len = col_info.get('CHARACTER_MAXIMUM_LENGTH') or col_info.get('character_maximum_length')
                             current_type_detail = col_info.get('COLUMN_TYPE') or col_info.get('udt_name')
                         else:
-                            # tuple-like: (data_type, udt_name, character_maximum_length)
                             current_data_type = col_info[0]
                             current_type_detail = col_info[1]
                             current_max_len = col_info[2]
@@ -1648,7 +1640,6 @@ class DatabasePopulator:
                             if self.db_type == 'mysql':
                                 modify_sql = f"ALTER TABLE {table} MODIFY COLUMN {col_name} {desired_type}"
                             else:
-                                # PostgreSQL: ALTER COLUMN TYPE
                                 modify_sql = f"ALTER TABLE {table} ALTER COLUMN {col_name} TYPE {desired_type}"
                             print(f"🔧 Enlarging column {table}.{col_name} from {cur_len} to {desired_v_len}")
                             try:
@@ -1765,6 +1756,10 @@ def main():
             if not populator.create_tables():
                 print("❌ Failed to create tables. Please check the error messages above.")
                 print("💡 Try running the demo mode: python demo_full_workflow.py")
+                return
+            # Ensure schema is up-to-date for employee_master (add missing columns if any)
+            if not populator.ensure_employee_master_columns():
+                print("✗ Failed to ensure employee_master schema is up-to-date. Please check database permissions.")
                 return
                 
         except AttributeError as e:
