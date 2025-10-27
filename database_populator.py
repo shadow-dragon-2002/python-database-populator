@@ -569,7 +569,6 @@ class DatabasePopulator:
                 qr_code_type VARCHAR(50),
                 qr_scan_rate DECIMAL(5,2),
                 malicious_qr_clicked BOOLEAN,
-                usb_plugged BOOLEAN,
                 device_type VARCHAR(50),
                 testing_status VARCHAR(20),
                 simulation_date DATE,
@@ -938,7 +937,6 @@ class DatabasePopulator:
             for _ in range(random.randint(2, 4)):
                 work_email = f"emp{employee_id}@fisst.edu"
                 personal_email = f"emp{employee_id}@gmail.com"
-                # click rate will be decided per-entry later (baseline vs intervention)
                 raw_entries.append((employee_id, work_email, personal_email))
 
         total = len(raw_entries)
@@ -953,7 +951,6 @@ class DatabasePopulator:
             arr = []
             for c in choices:
                 arr.extend([c] * reps)
-            # distribute remainder
             for i in range(rem):
                 arr.append(choices[i % len(choices)])
             random.shuffle(arr)
@@ -962,20 +959,9 @@ class DatabasePopulator:
         assigned_types = even_random_assignment(simulation_types, total)
         assigned_statuses = even_random_assignment(testing_statuses, total)
 
-        # To model baseline vs intervention outcomes, we'll mark half entries as baseline
-        half = total // 2
-        # baseline: high click (~22%), reporting ~0%; intervention: low click (~5%), reporting ~38%
-        reporting_rate_baseline = 0.0
-        reporting_rate_intervention = 0.38
-
         for idx, (employee_id, work_email, personal_email) in enumerate(raw_entries):
-            # choose base click depending on baseline/intervention
-            if idx < half:
-                click_response_rate = random.uniform(base_click_rate - 1.0, base_click_rate + 1.0)  # ~22%
-                reported = random.random() < reporting_rate_baseline
-            else:
-                click_response_rate = random.uniform(4.0, 6.0)  # intervention ~5%
-                reported = random.random() < reporting_rate_intervention
+            # Use consistent statistics with small individual variations
+            click_response_rate = random.uniform(base_click_rate - 1.5, base_click_rate + 1.5)
 
             sim_data.append((
                 employee_id,
@@ -1010,19 +996,22 @@ class DatabasePopulator:
         
         sim_data = []
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
-        # Build raw entries then assign testing_status evenly to avoid obvious repeating patterns
+        
+        # Build raw entries then assign testing_status evenly
         raw_entries = []
         for employee_id in employee_ids:
             for _ in range(random.randint(1, 3)):
                 phone_number = self.fake.indian_phone()
                 alt_phone_number = self.fake.indian_phone()
-                raw_entries.append((employee_id, phone_number, alt_phone_number))
-
+                vish_response_rate = random.uniform(base_vish_rate - 1.5, base_vish_rate + 1.5)
+                raw_entries.append((employee_id, phone_number, alt_phone_number, vish_response_rate))
+        
         total = len(raw_entries)
         if total == 0:
             print("✗ No employees to generate vishing simulations for")
             return False
-
+        
+        # Even randomized assignment
         def even_random_assignment(choices, n):
             reps = n // len(choices)
             rem = n % len(choices)
@@ -1033,18 +1022,16 @@ class DatabasePopulator:
                 arr.append(choices[i % len(choices)])
             random.shuffle(arr)
             return arr
-
+        
         assigned_statuses = even_random_assignment(testing_statuses, total)
-
-        for idx, (employee_id, phone_number, alt_phone_number) in enumerate(raw_entries):
-            vish_response_rate = random.uniform(base_vish_rate - 1.5, base_vish_rate + 1.5)
-            test_status = assigned_statuses[idx]
+        
+        for idx, (employee_id, phone_number, alt_phone_number, vish_response_rate) in enumerate(raw_entries):
             sim_data.append((
                 employee_id,
                 phone_number,
                 alt_phone_number,
-                round(vish_response_rate, 2),
-                test_status
+                vish_response_rate,
+                assigned_statuses[idx]
             ))
         
         try:
@@ -1065,25 +1052,30 @@ class DatabasePopulator:
     
     def generate_quishing_simulations(self, employee_ids):
         """Generate quishing (QR code phishing) simulation data"""
-        # Evenized quishing simulations with USB plug-in modeling
+        # Get consistent statistics
         consistent_stats = self.generate_consistent_statistics(len(employee_ids))
         base_qr_scan_rate = consistent_stats['quishing_scan_rate']
-
+        
         sim_data = []
         qr_code_types = ['Payment QR', 'WiFi QR', 'App Download QR', 'Survey QR', 'Menu QR', 'Contact QR']
         device_types = ['Mobile Phone', 'Tablet', 'Laptop', 'Desktop']
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
-
+        
+        # Build raw entries then assign evenly
         raw_entries = []
         for employee_id in employee_ids:
             for _ in range(random.randint(1, 2)):
-                raw_entries.append(employee_id)
-
+                qr_scan_rate = random.uniform(base_qr_scan_rate - 1.5, base_qr_scan_rate + 1.5)
+                malicious_qr_clicked = random.choice([True, False])
+                simulation_date = self.fake.date_between(start_date='-6m', end_date='today')
+                raw_entries.append((employee_id, qr_scan_rate, malicious_qr_clicked, simulation_date))
+        
         total = len(raw_entries)
         if total == 0:
             print("✗ No employees to generate quishing simulations for")
             return False
-
+        
+        # Even randomized assignment
         def even_random_assignment(choices, n):
             reps = n // len(choices)
             rem = n % len(choices)
@@ -1094,58 +1086,26 @@ class DatabasePopulator:
                 arr.append(choices[i % len(choices)])
             random.shuffle(arr)
             return arr
-
+        
         assigned_qr = even_random_assignment(qr_code_types, total)
         assigned_device = even_random_assignment(device_types, total)
         assigned_status = even_random_assignment(testing_statuses, total)
-
-        # Baseline vs intervention split (half-half)
-        half = total // 2
-        # baseline: usb plugs present (we'll set 11 across baseline), reporting low
-        usb_baseline_total = 11
-        usb_assigned = set()
-
-        for idx, employee_id in enumerate(raw_entries):
-            qr_code_type = assigned_qr[idx]
-            device_type = assigned_device[idx]
-            testing_status = assigned_status[idx]
-            if idx < half:
-                qr_scan_rate = random.uniform(base_qr_scan_rate - 1.0, base_qr_scan_rate + 1.0)
-                malicious_qr_clicked = random.choice([True, False])
-                usb_plugged = False  # baseline: we'll mark a few separately
-            else:
-                qr_scan_rate = random.uniform(4.0, 6.0)
-                malicious_qr_clicked = False
-                usb_plugged = False
-
-            simulation_date = self.fake.date_between(start_date='-6m', end_date='today')
-
+        
+        for idx, (employee_id, qr_scan_rate, malicious_qr_clicked, simulation_date) in enumerate(raw_entries):
             sim_data.append((
                 employee_id,
-                qr_code_type,
-                round(qr_scan_rate, 2),
+                assigned_qr[idx],
+                qr_scan_rate,
                 malicious_qr_clicked,
-                usb_plugged,
-                device_type,
-                testing_status,
+                assigned_device[idx],
+                assigned_status[idx],
                 simulation_date
             ))
-
-        # Assign exactly usb_baseline_total usb_plugged True entries within baseline portion
-        baseline_indices = [i for i in range(0, half)]
-        random.shuffle(baseline_indices)
-        for i in baseline_indices[:min(usb_baseline_total, len(baseline_indices))]:
-            entry = list(sim_data[i])
-            # usb_plugged is at index 4 in the tuple we constructed
-            entry[4] = True
-            sim_data[i] = tuple(entry)
         
         try:
             sql = """
-            INSERT INTO employee_quishing_sim (
-                employee_id, qr_code_type, qr_scan_rate, malicious_qr_clicked, usb_plugged, device_type, testing_status, simulation_date
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO employee_quishing_sim (employee_id, qr_code_type, qr_scan_rate, malicious_qr_clicked, device_type, testing_status, simulation_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
             
             self.cursor.executemany(sql, sim_data)
@@ -1216,8 +1176,8 @@ class DatabasePopulator:
                 assessor_name = self.fake.indian_name()
                 assessor_id = f"ASST{random.randint(1, 20):02d}"
                 notes = f"Red team assessment completed - {security_level} security level facility"
-
-                # Build tuple without testing_status (we'll assign testing_status evenly after collecting all entries)
+                
+                # Build tuple without testing_status (we'll assign evenly after collecting all entries)
                 assessment_data.append((
                     employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
                     assessment_date, assessment_time_start, assessment_time_end, permission_granted,
@@ -1229,32 +1189,31 @@ class DatabasePopulator:
                 ))
         
         try:
-            # Assign testing_status evenly across collected assessment entries to avoid patterns
+            # Assign testing_status evenly across collected assessment entries
             def even_random_assignment(choices, n):
                 reps = n // len(choices)
                 rem = n % len(choices)
                 arr = []
                 for c in choices:
                     arr.extend([c] * reps)
-                for i2 in range(rem):
-                    arr.append(choices[i2 % len(choices)])
+                for i in range(rem):
+                    arr.append(choices[i % len(choices)])
                 random.shuffle(arr)
                 return arr
-
-            if assessment_data:
-                assigned_statuses = even_random_assignment(testing_statuses, len(assessment_data))
-                final_assessment_data = [tuple(list(row) + [assigned_statuses[idx]]) for idx, row in enumerate(assessment_data)]
-            else:
-                final_assessment_data = []
-
-            if not final_assessment_data:
-                # Nothing to insert
-                print("✓ Generated 0 red team assessment entries!")
+            
+            total = len(assessment_data)
+            if total == 0:
+                print("✓ No red team assessments to generate (0 employees qualified)")
                 return True
-
-            num_cols = len(final_assessment_data[0])
-            placeholders = ', '.join(['%s'] * num_cols)
-            sql = f"""
+            
+            assigned_statuses = even_random_assignment(testing_statuses, total)
+            
+            # Append testing_status to each tuple
+            final_assessment_data = []
+            for idx, entry in enumerate(assessment_data):
+                final_assessment_data.append(entry + (assigned_statuses[idx],))
+            
+            sql = """
             INSERT INTO red_team_assessment (
                 employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
                 assessment_date, assessment_time_start, assessment_time_end, permission_granted,
@@ -1263,9 +1222,9 @@ class DatabasePopulator:
                 escort_required, restricted_areas_accessed, tailgating_possible, social_engineering_successful,
                 physical_security_score, human_security_score, overall_assessment_score,
                 vulnerabilities_found, recommendations, assessor_name, assessor_id, notes, testing_status
-            ) VALUES ({placeholders})
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
-
+            
             self.cursor.executemany(sql, final_assessment_data)
             self.connection.commit()
             print(f"✓ Generated {len(final_assessment_data)} red team assessment entries!")
@@ -1396,37 +1355,7 @@ class DatabasePopulator:
                         print(f"  {row['branch_code']} ({row['branch_location']}): {row['employee_count']} employees")
                     else:
                         print(f"  {row[0]} ({row[1]}): {row[2]} employees")
-                # Compute ROI and case-study metrics
-                try:
-                    # Phishing summary: approximate baseline vs intervention click rates
-                    self.cursor.execute("SELECT click_response_rate FROM employee_phish_smish_sim")
-                    click_rows = self.cursor.fetchall()
-                    clicks = [r['click_response_rate'] if isinstance(r, dict) else r[0] for r in click_rows if r]
-                    avg_click = sum(clicks) / len(clicks) if clicks else 0
-
-                    # USB plugs
-                    try:
-                        self.cursor.execute("SELECT COUNT(*) FROM employee_quishing_sim WHERE usb_plugged = TRUE")
-                        usb_count_row = self.cursor.fetchone()
-                        usb_count = usb_count_row['COUNT(*)'] if isinstance(usb_count_row, dict) else usb_count_row[0]
-                    except Exception:
-                        usb_count = 0
-
-                    # Reporting rate approximation (we don't store reporting; estimate from click->reported assumptions)
-                    # For demonstration, assume intervention reporting ~38% and baseline ~0% as generated
-
-                    avoided_fraud = 73000000  # ₹7.3 crore avoided phishing payroll fraud
-                    engagement_cost = max(1, int(avoided_fraud / 16))  # ensure >15x ROI (we use 16x)
-                    roi = avoided_fraud / engagement_cost if engagement_cost else 0
-
-                    print(f"\nCase-study highlights:")
-                    print(f"  • Average Click Response Rate (all sims): {avg_click:.2f}%")
-                    print(f"  • USB plug-ins detected (simulated baseline): {usb_count}")
-                    print(f"  • Estimated avoided fraud: ₹{avoided_fraud:,}")
-                    print(f"  • Engagement cost: ₹{engagement_cost:,}")
-                    print(f"  • ROI (avoided / engagement): {roi:.1f}x")
-                except Exception:
-                    pass
+            
         except Exception as e:
             print(f"Error generating statistics: {e}")
     
@@ -1781,11 +1710,6 @@ def main():
             return
         
         # Check if data exists
-        # Ensure schema is up-to-date (add missing columns if table existed from older schema)
-        if not populator.ensure_employee_master_columns():
-            print("✗ Failed to ensure employee_master schema is up-to-date. Please check database permissions.")
-            return
-
         data_exists = populator.check_data_exists()
         
         if data_exists:
