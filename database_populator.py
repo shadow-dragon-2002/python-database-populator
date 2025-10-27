@@ -781,12 +781,38 @@ class DatabasePopulator:
             family_details = f"Family of {random.randint(2, 6)} members"
             medical_conditions = random.choice(['None', 'Diabetes', 'Hypertension', 'Asthma', 'None', 'None'])  # Most have None
             
-            # Use consistent statistics with small individual variations
-            simulation_type = 'Baseline Assessment'
+            # We'll assign simulation types and testing statuses in an even but randomized way
+            # to avoid visible cyclic patterns while keeping overall balance.
+            def even_random_assignment(choices, n):
+                reps = n // len(choices)
+                rem = n % len(choices)
+                arr = []
+                for c in choices:
+                    arr.extend([c] * reps)
+                for i2 in range(rem):
+                    arr.append(choices[i2 % len(choices)])
+                random.shuffle(arr)
+                return arr
+
+            # Prepare balanced assignments once per run
+            if i == 0:
+                sim_choices = ['Phishing Test', 'Vishing Test', 'Quishing Test', 'Red Team Assessment']
+                phish_status_choices = ['Completed', 'Pending', 'Failed', 'Passed']
+                vish_status_choices = ['Completed', 'Pending', 'Failed', 'Passed']
+                red_status_choices = ['Completed', 'In Progress', 'Scheduled', 'Cancelled']
+                # Balanced assignments across all employees
+                assigned_simulation_types = even_random_assignment(sim_choices, num_employees)
+                assigned_phish_statuses = even_random_assignment(phish_status_choices, num_employees)
+                assigned_vish_statuses = even_random_assignment(vish_status_choices, num_employees)
+                assigned_red_statuses = even_random_assignment(red_status_choices, num_employees)
+
+            # Take the precomputed assigned values for this employee
+            simulation_type = assigned_simulation_types[i]
             base_click_rate = consistent_stats['phishing_click_rate']
-            click_response_rate = random.uniform(base_click_rate - 1, base_click_rate + 1)  # Small individual variation
+            # We'll add a small individual variation to look realistic
+            click_response_rate = random.uniform(base_click_rate - 1, base_click_rate + 1)
             phish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
-            phish_testing_status = 'Completed'
+            phish_testing_status = assigned_phish_statuses[i]
             
             # Vishing data with consistent stats
             vishing_phone_number = phone_number
@@ -795,7 +821,8 @@ class DatabasePopulator:
             base_vish_rate = consistent_stats['vishing_response_rate']
             vish_response_rate = random.uniform(base_vish_rate - 1, base_vish_rate + 1)  # Small individual variation
             vish_test_simulation_date = self.fake.date_between(start_date='-6m', end_date='-3m')
-            vish_testing_status = 'Completed'
+            # Use preassigned vishing testing status
+            vish_testing_status = assigned_vish_statuses[i]
             
             # Branch and assessment data
             branch_idx = i % len(branch_codes)
@@ -844,7 +871,8 @@ class DatabasePopulator:
             assessor_name = self.fake.indian_name()
             assessor_id = f"ASST{random.randint(1, 20):02d}"
             notes = f"Assessment completed for {department} department employee"
-            red_team_testing_status = 'Completed'
+            # Use preassigned red team testing status
+            red_team_testing_status = assigned_red_statuses[i]
             
             employees_data.append((
                 employee_id, first_name, last_name, gender, date_of_birth, age, blood_group, marital_status,
@@ -895,32 +923,54 @@ class DatabasePopulator:
     
     def generate_phish_smish_simulations(self, employee_ids):
         """Generate phishing/smishing simulation data"""
-        # Get consistent statistics
+        # Create phish/smish sim entries with even but randomized distribution
         consistent_stats = self.generate_consistent_statistics(len(employee_ids))
         base_click_rate = consistent_stats['phishing_click_rate']
-        
+
         sim_data = []
         simulation_types = ['Email Phishing', 'SMS Phishing', 'Social Media Phishing']
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
-        
+
+        # Build raw entries first (so total count is known) then assign even randomized categories
+        raw_entries = []
         for employee_id in employee_ids:
-            # Generate multiple simulation entries per employee
             for _ in range(random.randint(2, 4)):
-                # Get employee work and personal email from employee_master
                 work_email = f"emp{employee_id}@fisst.edu"
                 personal_email = f"emp{employee_id}@gmail.com"
-                
-                # Use consistent statistics with small individual variations
-                click_response_rate = random.uniform(base_click_rate - 1.5, base_click_rate + 1.5)
-                
-                sim_data.append((
-                    employee_id,
-                    random.choice(simulation_types),
-                    work_email,
-                    personal_email,
-                    click_response_rate,
-                    random.choice(testing_statuses)
-                ))
+                raw_entries.append((employee_id, work_email, personal_email))
+
+        total = len(raw_entries)
+        if total == 0:
+            print("✗ No employees to generate phish/smish simulations for")
+            return False
+
+        # Helper: create an even randomized assignment list
+        def even_random_assignment(choices, n):
+            reps = n // len(choices)
+            rem = n % len(choices)
+            arr = []
+            for c in choices:
+                arr.extend([c] * reps)
+            for i in range(rem):
+                arr.append(choices[i % len(choices)])
+            random.shuffle(arr)
+            return arr
+
+        assigned_types = even_random_assignment(simulation_types, total)
+        assigned_statuses = even_random_assignment(testing_statuses, total)
+
+        for idx, (employee_id, work_email, personal_email) in enumerate(raw_entries):
+            # Use consistent statistics with small individual variations
+            click_response_rate = random.uniform(base_click_rate - 1.5, base_click_rate + 1.5)
+
+            sim_data.append((
+                employee_id,
+                assigned_types[idx],
+                work_email,
+                personal_email,
+                round(click_response_rate, 2),
+                assigned_statuses[idx]
+            ))
         
         try:
             sql = """
@@ -947,22 +997,42 @@ class DatabasePopulator:
         sim_data = []
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
         
+        # Build raw entries then assign testing_status evenly
+        raw_entries = []
         for employee_id in employee_ids:
-            # Generate vishing simulation entries
             for _ in range(random.randint(1, 3)):
                 phone_number = self.fake.indian_phone()
                 alt_phone_number = self.fake.indian_phone()
-                
-                # Use consistent statistics with small individual variations
                 vish_response_rate = random.uniform(base_vish_rate - 1.5, base_vish_rate + 1.5)
-                
-                sim_data.append((
-                    employee_id,
-                    phone_number,
-                    alt_phone_number,
-                    vish_response_rate,
-                    random.choice(testing_statuses)
-                ))
+                raw_entries.append((employee_id, phone_number, alt_phone_number, vish_response_rate))
+        
+        total = len(raw_entries)
+        if total == 0:
+            print("✗ No employees to generate vishing simulations for")
+            return False
+        
+        # Even randomized assignment
+        def even_random_assignment(choices, n):
+            reps = n // len(choices)
+            rem = n % len(choices)
+            arr = []
+            for c in choices:
+                arr.extend([c] * reps)
+            for i in range(rem):
+                arr.append(choices[i % len(choices)])
+            random.shuffle(arr)
+            return arr
+        
+        assigned_statuses = even_random_assignment(testing_statuses, total)
+        
+        for idx, (employee_id, phone_number, alt_phone_number, vish_response_rate) in enumerate(raw_entries):
+            sim_data.append((
+                employee_id,
+                phone_number,
+                alt_phone_number,
+                vish_response_rate,
+                assigned_statuses[idx]
+            ))
         
         try:
             sql = """
@@ -991,27 +1061,46 @@ class DatabasePopulator:
         device_types = ['Mobile Phone', 'Tablet', 'Laptop', 'Desktop']
         testing_statuses = ['Completed', 'Pending', 'Failed', 'Passed']
         
+        # Build raw entries then assign evenly
+        raw_entries = []
         for employee_id in employee_ids:
-            # Generate quishing simulation entries
             for _ in range(random.randint(1, 2)):
-                qr_code_type = random.choice(qr_code_types)
-                
-                # Use consistent statistics with small individual variations
                 qr_scan_rate = random.uniform(base_qr_scan_rate - 1.5, base_qr_scan_rate + 1.5)
                 malicious_qr_clicked = random.choice([True, False])
-                device_type = random.choice(device_types)
-                testing_status = random.choice(testing_statuses)
                 simulation_date = self.fake.date_between(start_date='-6m', end_date='today')
-                
-                sim_data.append((
-                    employee_id,
-                    qr_code_type,
-                    qr_scan_rate,
-                    malicious_qr_clicked,
-                    device_type,
-                    testing_status,
-                    simulation_date
-                ))
+                raw_entries.append((employee_id, qr_scan_rate, malicious_qr_clicked, simulation_date))
+        
+        total = len(raw_entries)
+        if total == 0:
+            print("✗ No employees to generate quishing simulations for")
+            return False
+        
+        # Even randomized assignment
+        def even_random_assignment(choices, n):
+            reps = n // len(choices)
+            rem = n % len(choices)
+            arr = []
+            for c in choices:
+                arr.extend([c] * reps)
+            for i in range(rem):
+                arr.append(choices[i % len(choices)])
+            random.shuffle(arr)
+            return arr
+        
+        assigned_qr = even_random_assignment(qr_code_types, total)
+        assigned_device = even_random_assignment(device_types, total)
+        assigned_status = even_random_assignment(testing_statuses, total)
+        
+        for idx, (employee_id, qr_scan_rate, malicious_qr_clicked, simulation_date) in enumerate(raw_entries):
+            sim_data.append((
+                employee_id,
+                assigned_qr[idx],
+                qr_scan_rate,
+                malicious_qr_clicked,
+                assigned_device[idx],
+                assigned_status[idx],
+                simulation_date
+            ))
         
         try:
             sql = """
@@ -1087,8 +1176,8 @@ class DatabasePopulator:
                 assessor_name = self.fake.indian_name()
                 assessor_id = f"ASST{random.randint(1, 20):02d}"
                 notes = f"Red team assessment completed - {security_level} security level facility"
-                testing_status = random.choice(testing_statuses)
                 
+                # Build tuple without testing_status (we'll assign evenly after collecting all entries)
                 assessment_data.append((
                     employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
                     assessment_date, assessment_time_start, assessment_time_end, permission_granted,
@@ -1096,10 +1185,34 @@ class DatabasePopulator:
                     identity_verified, security_guard_present, visitor_log_maintained, badge_issued,
                     escort_required, restricted_areas_accessed, tailgating_possible, social_engineering_successful,
                     physical_security_score, human_security_score, overall_assessment_score,
-                    vulnerabilities_found, recommendations, assessor_name, assessor_id, notes, testing_status
+                    vulnerabilities_found, recommendations, assessor_name, assessor_id, notes
                 ))
         
         try:
+            # Assign testing_status evenly across collected assessment entries
+            def even_random_assignment(choices, n):
+                reps = n // len(choices)
+                rem = n % len(choices)
+                arr = []
+                for c in choices:
+                    arr.extend([c] * reps)
+                for i in range(rem):
+                    arr.append(choices[i % len(choices)])
+                random.shuffle(arr)
+                return arr
+            
+            total = len(assessment_data)
+            if total == 0:
+                print("✓ No red team assessments to generate (0 employees qualified)")
+                return True
+            
+            assigned_statuses = even_random_assignment(testing_statuses, total)
+            
+            # Append testing_status to each tuple
+            final_assessment_data = []
+            for idx, entry in enumerate(assessment_data):
+                final_assessment_data.append(entry + (assigned_statuses[idx],))
+            
             sql = """
             INSERT INTO red_team_assessment (
                 employee_id, branch_code, local_employees_at_branch, security_level, building_storeys,
@@ -1112,9 +1225,9 @@ class DatabasePopulator:
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             
-            self.cursor.executemany(sql, assessment_data)
+            self.cursor.executemany(sql, final_assessment_data)
             self.connection.commit()
-            print(f"✓ Generated {len(assessment_data)} red team assessment entries!")
+            print(f"✓ Generated {len(final_assessment_data)} red team assessment entries!")
             return True
             
         except Exception as e:
